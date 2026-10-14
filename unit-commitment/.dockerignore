@@ -1,6 +1,10 @@
-.venv/
+﻿.venv/
 __pycache__/
 *.pyc
 .pytest_cache/
 outputs/
 .env
+tests/
+e2e/
+frontend/
+requirements-dev.txt

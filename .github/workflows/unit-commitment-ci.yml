@@ -23,21 +23,49 @@ jobs:
         with:
           python-version: "3.12"
           cache: "pip"
-          cache-dependency-path: "unit-commitment/requirements.txt"
+          cache-dependency-path: "unit-commitment/requirements-dev.txt"
 
       - name: Install dependencies
         working-directory: unit-commitment
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
 
       - name: Compile Python files
         working-directory: unit-commitment
-        run: python -m compileall data solver tests run_demo.py
+        run: python -m compileall data solver tests e2e run_demo.py
 
-      - name: Run tests
+      - name: Run unit and API tests
         working-directory: unit-commitment
         run: pytest
 
       - name: Build Docker image
         run: docker build -t unit-commitment-api:ci ./unit-commitment
+
+      - name: Start the Docker container
+        run: |
+          docker run -d --name uc-api -p 8000:7860 unit-commitment-api:ci
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8000/health && exit 0
+            sleep 2
+          done
+          docker logs uc-api
+          exit 1
+
+      - name: Install browser for end-to-end tests
+        working-directory: unit-commitment
+        run: python -m playwright install --with-deps chromium
+
+      - name: Serve the frontend
+        working-directory: unit-commitment
+        run: nohup python -m http.server 3000 --directory frontend > /dev/null 2>&1 &
+
+      - name: Run end-to-end tests against the container
+        working-directory: unit-commitment
+        env:
+          E2E_EXTERNAL: "1"
+        run: pytest e2e
+
+      - name: Show container logs on failure
+        if: failure()
+        run: docker logs uc-api
