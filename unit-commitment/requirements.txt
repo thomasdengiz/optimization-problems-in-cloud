@@ -4,3 +4,5 @@ fastapi==0.111.0
 uvicorn==0.30.1
 pyomo==6.7.3
 highspy==1.14.0
+# Pyomo 6.7.3 uses np.float_, which was removed in NumPy 2.0
+numpy==1.26.4
