@@ -1,0 +1,43 @@
+name: Unit Commitment CI
+
+on:
+  push:
+    paths:
+      - "unit-commitment/**"
+      - ".github/workflows/unit-commitment-ci.yml"
+  pull_request:
+    paths:
+      - "unit-commitment/**"
+      - ".github/workflows/unit-commitment-ci.yml"
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: "unit-commitment/requirements.txt"
+
+      - name: Install dependencies
+        working-directory: unit-commitment
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Compile Python files
+        working-directory: unit-commitment
+        run: python -m compileall data solver tests run_demo.py
+
+      - name: Run tests
+        working-directory: unit-commitment
+        run: pytest
+
+      - name: Build Docker image
+        run: docker build -t unit-commitment-api:ci ./unit-commitment
