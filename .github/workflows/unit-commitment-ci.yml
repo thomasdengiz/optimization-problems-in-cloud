@@ -69,3 +69,50 @@ jobs:
       - name: Show container logs on failure
         if: failure()
         run: docker logs uc-api
+
+  # Continuous delivery: runs only on pushes to main and only if all tests above passed.
+  # Builds the image, publishes it to GitHub's container registry and rolls it out to Azure.
+  deploy-backend:
+    needs: test-and-build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write   # push the image to ghcr.io
+      id-token: write   # passwordless login to Azure (OIDC)
+    env:
+      AZURE_RESOURCE_GROUP: rg-unit-commitment
+      AZURE_CONTAINER_APP: unit-commitment-solver
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push the image
+        run: |
+          # Registry paths must be lower case
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/unit-commitment-api"
+          echo "IMAGE=${IMAGE}" >> "$GITHUB_ENV"
+          docker build -t "${IMAGE}:${GITHUB_SHA}" ./unit-commitment
+          docker push "${IMAGE}:${GITHUB_SHA}"
+
+      - name: Log in to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Roll out the new image
+        run: |
+          az containerapp update \
+            --name "${AZURE_CONTAINER_APP}" \
+            --resource-group "${AZURE_RESOURCE_GROUP}" \
+            --image "${IMAGE}:${GITHUB_SHA}"
