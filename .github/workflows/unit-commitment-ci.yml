@@ -111,15 +111,16 @@ jobs:
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       - name: Roll out the new image
         run: |
-          az containerapp registry set \
-            --name "${AZURE_CONTAINER_APP}" \
-            --resource-group "${AZURE_RESOURCE_GROUP}" \
-            --server ghcr.io \
-            --username "${{ github.actor }}" \
-            --password "${{ secrets.GITHUB_TOKEN }}"
+                # 1. Alte, festgefressene Registry-Einträge aus Azure löschen, da das Image public ist
+                az containerapp registry remove \
+                  --name "${AZURE_CONTAINER_APP}" \
+                  --resource-group "${AZURE_RESOURCE_GROUP}" \
+                  --server ghcr.io \
+                  --yes || true
 
-          az containerapp update \
-            --name "${AZURE_CONTAINER_APP}" \
-            --resource-group "${AZURE_RESOURCE_GROUP}" \
-            --image "${IMAGE}:${GITHUB_SHA}"
+                # 2. Ganz normal das öffentliche Image aktualisieren
+                az containerapp update \
+                  --name "${AZURE_CONTAINER_APP}" \
+                  --resource-group "${AZURE_RESOURCE_GROUP}" \
+                  --image "${IMAGE}:${GITHUB_SHA}"
 
