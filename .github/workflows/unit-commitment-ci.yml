@@ -108,13 +108,18 @@ jobs:
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}- name: Roll out the new image
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Roll out the new image
+        env:
+          GH_ACTOR: ${{ github.actor }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           az containerapp update \
             --name "${AZURE_CONTAINER_APP}" \
             --resource-group "${AZURE_RESOURCE_GROUP}" \
             --image "${IMAGE}:${GITHUB_SHA}" \
             --registry-server ghcr.io \
-            --registry-username "${{ github.actor }}" \
-            --registry-password "${{ secrets.GITHUB_TOKEN }}"
+            --registry-username "${GH_ACTOR}" \
+            --registry-password "${GH_TOKEN}"
 
