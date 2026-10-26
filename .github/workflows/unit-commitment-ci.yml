@@ -111,15 +111,10 @@ jobs:
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
       - name: Roll out the new image
-        env:
-          GH_ACTOR: ${{ github.actor }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # The package is public, so Azure needs no registry credentials to pull it
         run: |
           az containerapp update \
             --name "${AZURE_CONTAINER_APP}" \
             --resource-group "${AZURE_RESOURCE_GROUP}" \
-            --image "${IMAGE}:${GITHUB_SHA}" \
-            --registry-server ghcr.io \
-            --registry-username "${GH_ACTOR}" \
-            --registry-password "${GH_TOKEN}"
+            --image "${IMAGE}:${GITHUB_SHA}"
 
