@@ -115,7 +115,5 @@ jobs:
           az containerapp update \
             --name "${AZURE_CONTAINER_APP}" \
             --resource-group "${AZURE_RESOURCE_GROUP}" \
-            --image "${IMAGE}:${GITHUB_SHA}" \
-            --registry-server ghcr.io \
-            --registry-username ${{ github.actor }} \
-            --registry-password ${{ secrets.GITHUB_TOKEN }}
+            --image "${IMAGE}:${GITHUB_SHA}" 
+
