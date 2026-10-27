@@ -44,7 +44,9 @@ jobs:
 
       - name: Start the Docker container
         run: |
-          docker run -d --name uc-api -p 8000:7860 unit-commitment-api:ci
+          docker run -d --name uc-api -p 8000:7860 unit-commitment-api:ci || true
+          # Falls der Container sofort stirbt, zeigen wir hier direkt die Logs:
+          docker logs uc-api || true
           for i in $(seq 1 30); do
             curl -sf http://localhost:8000/health && exit 0
             sleep 2
