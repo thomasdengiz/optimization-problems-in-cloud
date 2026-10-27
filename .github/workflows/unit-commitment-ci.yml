@@ -71,34 +71,33 @@ jobs:
         run: docker logs uc-api
 
   # Continuous delivery: runs only on pushes to main and only if all tests above passed.
-  # Builds the image, publishes it to GitHub's container registry and rolls it out to Azure.
+  # Builds the image, publishes it to Azure Container Registry and rolls it out to Azure Container Apps.
   deploy-backend:
     needs: test-and-build
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write   # push the image to ghcr.io
       id-token: write   # passwordless login to Azure (OIDC)
     env:
       AZURE_RESOURCE_GROUP: rg-unit-commitment
       AZURE_CONTAINER_APP: unit-commitment-solver
+      AZURE_REGISTRY: ucregistrythomas.azurecr.io
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Log in to GitHub Container Registry
+      - name: Log in to Azure Container Registry
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          registry: ${{ env.AZURE_REGISTRY }}
+          username: ucregistrythomas
+          password: ${{ secrets.ACR_PASSWORD }}
 
       - name: Build and push the image
         run: |
-          # Registry paths must be lower case
-          IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/unit-commitment-api"
+          IMAGE="${AZURE_REGISTRY}/unit-commitment-api"
           echo "IMAGE=${IMAGE}" >> "$GITHUB_ENV"
           docker build -t "${IMAGE}:${GITHUB_SHA}" ./unit-commitment
           docker push "${IMAGE}:${GITHUB_SHA}"
@@ -110,28 +109,9 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-
-      - name: Set Azure Container Registry credentials
-        run: |
-          az containerapp registry set \
-            --name "${AZURE_CONTAINER_APP}" \
-            --resource-group "${AZURE_RESOURCE_GROUP}" \
-            --server ghcr.io \
-            --username "${{ github.actor }}" \
-            --password "${{ secrets.GITHUB_TOKEN }}"
-
       - name: Roll out the new image
         run: |
           az containerapp update \
             --name "${AZURE_CONTAINER_APP}" \
             --resource-group "${AZURE_RESOURCE_GROUP}" \
             --image "${IMAGE}:${GITHUB_SHA}"
-
-      - name: Roll out the new image
-        # The package is public, so Azure needs no registry credentials to pull it
-        run: |
-          az containerapp update \
-            --name "${AZURE_CONTAINER_APP}" \
-            --resource-group "${AZURE_RESOURCE_GROUP}" \
-            --image "${IMAGE}:${GITHUB_SHA}"
-
