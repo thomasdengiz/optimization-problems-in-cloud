@@ -125,4 +125,7 @@ jobs:
           az containerapp update \
             --name "${AZURE_CONTAINER_APP}" \
             --resource-group "${AZURE_RESOURCE_GROUP}" \
-            --image "${IMAGE}:${GITHUB_SHA}"
+            --image "${IMAGE}:${GITHUB_SHA}" \
+            --registry-server "${AZURE_REGISTRY}" \
+            --registry-username "ucregistrythomas" \
+            --registry-password "${{ secrets.ACR_PASSWORD }}"
