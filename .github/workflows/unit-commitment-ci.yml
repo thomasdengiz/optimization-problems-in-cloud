@@ -44,9 +44,7 @@ jobs:
 
       - name: Start the Docker container
         run: |
-          docker run -d --name uc-api -p 8000:7860 unit-commitment-api:ci || true
-          # Falls der Container sofort stirbt, zeigen wir hier direkt die Logs:
-          docker logs uc-api || true
+          docker run -d --name uc-api -p 8000:7860 unit-commitment-api:ci
           for i in $(seq 1 30); do
             curl -sf http://localhost:8000/health && exit 0
             sleep 2
@@ -73,33 +71,34 @@ jobs:
         run: docker logs uc-api
 
   # Continuous delivery: runs only on pushes to main and only if all tests above passed.
-  # Builds the image, publishes it to Azure Container Registry and rolls it out to Azure Container Apps.
+  # Builds the image, publishes it to GitHub's container registry and rolls it out to Azure.
   deploy-backend:
     needs: test-and-build
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      packages: write   # push the image to ghcr.io
       id-token: write   # passwordless login to Azure (OIDC)
     env:
       AZURE_RESOURCE_GROUP: rg-unit-commitment
       AZURE_CONTAINER_APP: unit-commitment-solver
-      AZURE_REGISTRY: ucregistrythomas.azurecr.io
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Log in to Azure Container Registry
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.AZURE_REGISTRY }}
-          username: ucregistrythomas
-          password: ${{ secrets.ACR_PASSWORD }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push the image
         run: |
-          IMAGE="${AZURE_REGISTRY}/unit-commitment-api"
+          # Registry paths must be lower case
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/unit-commitment-api"
           echo "IMAGE=${IMAGE}" >> "$GITHUB_ENV"
           docker build -t "${IMAGE}:${GITHUB_SHA}" ./unit-commitment
           docker push "${IMAGE}:${GITHUB_SHA}"
@@ -111,21 +110,44 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Set Azure Container Registry credentials in Azure
+
+      - name: Check that the image can be pulled anonymously
+        # Azure pulls the image without credentials, so the package must be public.
+        # This fails early with a clear message instead of a cryptic Azure error.
         run: |
-          az containerapp registry set \
+          OWNER="${GITHUB_REPOSITORY_OWNER,,}"
+          TOKEN=$(curl -s "https://ghcr.io/token?scope=repository:${OWNER}/unit-commitment-api:pull" | jq -r .token)
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${TOKEN}" \
+            -H "Accept: application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json, application/vnd.oci.image.manifest.v1+json" \
+            "https://ghcr.io/v2/${OWNER}/unit-commitment-api/manifests/${GITHUB_SHA}")
+          echo "Anonymous manifest request returned HTTP ${STATUS}"
+          if [ "${STATUS}" != "200" ]; then
+            echo "::error::Image is not publicly pullable. Set the package visibility to Public on GitHub."
+            exit 1
+          fi
+
+      - name: Remove stored registry credentials from the Container App
+        # Old, expired credentials make Azure fail with "403 Forbidden" even for public images.
+        # The command fails if no entry exists, which is fine.
+        run: |
+          az containerapp registry remove \
             --name "${AZURE_CONTAINER_APP}" \
             --resource-group "${AZURE_RESOURCE_GROUP}" \
-            --server "${AZURE_REGISTRY}" \
-            --username "ucregistrythomas" \
-            --password "${{ secrets.ACR_PASSWORD }}"
+            --server ghcr.io || true
 
       - name: Roll out the new image
         run: |
           az containerapp update \
             --name "${AZURE_CONTAINER_APP}" \
             --resource-group "${AZURE_RESOURCE_GROUP}" \
-            --image "${IMAGE}:${GITHUB_SHA}" \
-            --registry-server "${AZURE_REGISTRY}" \
-            --registry-username "ucregistrythomas" \
-            --registry-password "${{ secrets.ACR_PASSWORD }}"
+            --image "${IMAGE}:${GITHUB_SHA}"
+
+      - name: Show Azure diagnostics on failure
+        if: failure()
+        run: |
+          az containerapp show --name "${AZURE_CONTAINER_APP}" --resource-group "${AZURE_RESOURCE_GROUP}" \
+            --query "{image:properties.template.containers[0].image, registries:properties.configuration.registries, ingress:properties.configuration.ingress.targetPort, state:properties.provisioningState}" -o json
+          az containerapp revision list --name "${AZURE_CONTAINER_APP}" --resource-group "${AZURE_RESOURCE_GROUP}" \
+            --query "[].{name:name, active:properties.active, health:properties.healthState, state:properties.provisioningState}" -o table
+
