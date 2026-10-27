@@ -109,6 +109,15 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Set Azure Container Registry credentials in Azure
+        run: |
+          az containerapp registry set \
+            --name "${AZURE_CONTAINER_APP}" \
+            --resource-group "${AZURE_RESOURCE_GROUP}" \
+            --server "${AZURE_REGISTRY}" \
+            --username "ucregistrythomas" \
+            --password "${{ secrets.ACR_PASSWORD }}"
+
       - name: Roll out the new image
         run: |
           az containerapp update \
