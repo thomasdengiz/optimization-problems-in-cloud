@@ -54,7 +54,18 @@ def servers():
 
 @pytest.fixture
 def app_page(page):
-    """Open the web page and wait until the backend answered and the methods are loaded."""
+    """Open the web page against the local backend and wait until the methods are loaded.
+
+    config.js points to the production backend, so the tests replace it with a config
+    that points to the local backend (or the Docker container started by the CI).
+    """
+    page.route(
+        "**/config.js",
+        lambda route: route.fulfill(
+            content_type="application/javascript",
+            body=f'window.APP_CONFIG = {{ API_BASE_URL: "{API_URL}" }};',
+        ),
+    )
     page.goto(FRONTEND_URL)
     page.wait_for_function("document.querySelectorAll('#method option').length > 0", timeout=60000)
     return page
