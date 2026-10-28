@@ -134,7 +134,10 @@ def get_job(job_id: str):
     """Return the status of a job and, once finished, its result or error message."""
     job = job_manager.get(job_id)
     if job is None:
-        raise HTTPException(404, f"Unknown job: {job_id}")
+        raise HTTPException(
+            404,
+            f"Unknown job: {job_id} (the server may have restarted since the job was submitted)",
+        )
     return job
 
 

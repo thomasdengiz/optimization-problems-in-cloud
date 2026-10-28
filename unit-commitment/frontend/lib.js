@@ -4,6 +4,19 @@
 
 export const HOURS_PER_DAY = 24;
 
+/**
+ * Turn an error into a message for the user.
+ * fetch() rejects with a TypeError when the server cannot be reached at all (server asleep,
+ * restarting, no internet, blocked by CORS); the browser console shows the technical details.
+ */
+export function friendlyErrorMessage(error) {
+  if (error instanceof TypeError) {
+    return "Server nicht erreichbar (möglicherweise Kaltstart oder Neustart). "
+      + "Bitte in einer Minute erneut versuchen. Details stehen in der Browser-Konsole (F12).";
+  }
+  return error.message;
+}
+
 /** Number of day slices contained in a result with T hourly values. */
 export function numberOfDays(hours) {
   return Math.ceil(hours / HOURS_PER_DAY);

@@ -5,6 +5,7 @@ POST /solve submits a job and returns a job_id immediately; the web page then po
 GET /jobs/{job_id}. Jobs run in separate worker processes so the API stays responsive
 and a CPU-heavy solve cannot block other requests. Jobs are kept in memory only.
 """
+import logging
 import multiprocessing
 import os
 import time
@@ -13,6 +14,18 @@ from concurrent.futures import Future, ProcessPoolExecutor
 
 from .exact import solve_exact
 from .priority_list import solve_priority_list
+
+# Log lines end up in the container console (Azure log stream). Worker processes import this
+# module as well, so they get the same setup.
+# Only our own logger gets a handler. A handler on the root logger would also print Pyomo's
+# INFO messages, and Pyomo captures the solver's console output into exactly those messages,
+# which makes the program loop endlessly (and hang the solve).
+logger = logging.getLogger("unit_commitment")
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+    logger.addHandler(_handler)
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
 MAX_JOBS_KEPT = 200  # oldest finished jobs are dropped beyond this number
@@ -26,19 +39,33 @@ def run_solve(
     time_limit: int,
     mip_gap: float | None,
 ) -> dict:
-    """Run one optimization (executed inside a worker process) and return the result dict."""
-    start = time.perf_counter()
-    if method == "exact":
-        result = solve_exact(scenario, month, DATA_DIR, horizon, time_limit=time_limit, mip_gap=mip_gap)
-    elif method == "priority_list":
-        result = solve_priority_list(scenario, month, DATA_DIR, horizon)
-    else:
-        raise ValueError(f"Unknown method: {method}")
+    """Run one optimization (executed inside a worker process) and return the result dict.
 
-    result["solve_time_ms"] = round((time.perf_counter() - start) * 1000, 2)
+    Start, end and failures are logged so problems can be traced in the server logs.
+    """
+    description = f"method={method} scenario={scenario} horizon={horizon} month={month}"
+    logger.info("Job started: %s time_limit=%s mip_gap=%s", description, time_limit, mip_gap)
+    start = time.perf_counter()
+    try:
+        if method == "exact":
+            result = solve_exact(scenario, month, DATA_DIR, horizon, time_limit=time_limit, mip_gap=mip_gap)
+        elif method == "priority_list":
+            result = solve_priority_list(scenario, month, DATA_DIR, horizon)
+        else:
+            raise ValueError(f"Unknown method: {method}")
+    except Exception:
+        logger.exception("Job failed: %s", description)  # includes the traceback
+        raise
+
+    duration = time.perf_counter() - start
+    result["solve_time_ms"] = round(duration * 1000, 2)
     result["scenario"] = scenario
     result["horizon"] = horizon
     result["month"] = month
+    logger.info(
+        "Job finished: %s feasible=%s cost=%.0f duration=%.1fs",
+        description, result["feasible"], result["total_cost_eur"], duration,
+    )
     return result
 
 
@@ -65,6 +92,7 @@ class JobManager:
         self._drop_old_jobs()
         job_id = uuid.uuid4().hex
         self._jobs[job_id] = self._get_executor().submit(run_solve, **params)
+        logger.info("Job %s submitted (%d jobs stored)", job_id, len(self._jobs))
         return job_id
 
     def get(self, job_id: str) -> dict | None:

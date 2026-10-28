@@ -65,3 +65,48 @@ def test_unimplemented_method_shows_placeholder_and_disables_solve(app_page: Pag
 
     expect(app_page.get_by_test_id("placeholder-note")).to_be_visible()
     expect(app_page.get_by_test_id("solve-button")).to_be_disabled()
+
+
+def test_lost_job_shows_clear_message(app_page: Page):
+    # Simulate a server restart: it no longer knows the job
+    app_page.route(
+        "**/jobs/*",
+        lambda route: route.fulfill(status=404, content_type="application/json", body='{"detail": "Unknown job"}'),
+    )
+    select_germany(app_page)
+
+    app_page.get_by_test_id("solve-button").click()
+
+    expect(app_page.get_by_test_id("status")).to_contain_text("Auftrag ging verloren", timeout=30000)
+    expect(app_page.get_by_test_id("solve-button")).to_be_enabled()
+
+
+def test_short_connection_problems_while_polling_are_retried(app_page: Page):
+    failed_requests = []
+
+    def flaky_jobs(route):
+        """Fail the first two status requests like a restarting server, then let them through."""
+        if len(failed_requests) < 2:
+            failed_requests.append(route.request.url)
+            route.abort()
+        else:
+            route.continue_()
+
+    app_page.route("**/jobs/*", flaky_jobs)
+    select_germany(app_page)
+
+    app_page.get_by_test_id("solve-button").click()
+
+    expect(app_page.get_by_test_id("r-feasible")).to_have_text("ja", timeout=60000)
+    assert len(failed_requests) == 2
+
+
+def test_unreachable_server_shows_helpful_message(app_page: Page):
+    select_germany(app_page)
+    # The server disappears after the page has loaded and never comes back
+    app_page.route("**/health", lambda route: route.abort())
+    app_page.route("**/solve", lambda route: route.abort())
+
+    app_page.get_by_test_id("solve-button").click()
+
+    expect(app_page.get_by_test_id("status")).to_contain_text("Server wird aufgeweckt")

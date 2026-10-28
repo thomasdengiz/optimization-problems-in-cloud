@@ -3,12 +3,15 @@
  * Pure helper functions live in lib.js.
  */
 import {
-  buildDayProfile, buildSolveRequest, formatGap, formatNumber, numberOfDays,
+  buildDayProfile, buildSolveRequest, formatGap, formatNumber, friendlyErrorMessage, numberOfDays,
 } from "./lib.js";
 
 const API = window.APP_CONFIG.API_BASE_URL.replace(/\/$/, "");
 const POLL_INTERVAL_MS = 1000;
 const HEALTH_RETRY_MS = 3000;
+const WAKE_UP_TIMEOUT_MS = 3 * 60 * 1000;   // how long to wait for a sleeping server
+const MAX_POLL_FAILURES = 5;                 // consecutive failed status requests before giving up
+const POLL_RETRY_MS = 2000;
 const MONTHS = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli",
   "August", "September", "Oktober", "November", "Dezember"];
 // Only these countries can be selected on the map (the data exists only for Germany so far)
@@ -28,19 +31,39 @@ function updateSolveButton() {
   $("solve").disabled = !(state.country && method && method.available && !state.running);
 }
 
-/** Wait for the backend (it may be asleep on a free host) and then load the method list. */
-async function connectToServer() {
-  const banner = $("server-banner");
+/** Pause for the given number of milliseconds. */
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Raised when the server no longer knows a job (it restarted and forgot all jobs). */
+class JobLostError extends Error {}
+
+/**
+ * Wait until the backend answers /health. A free host puts the server to sleep when it is not
+ * used, so the first requests can fail for up to a minute. onWaiting is called before each retry.
+ */
+async function waitForServer(onWaiting, timeoutMs = Infinity) {
+  const startedAt = Date.now();
   for (;;) {
     try {
       const response = await fetch(`${API}/health`);
-      if (response.ok) break;
-    } catch (_error) {
-      // server not reachable yet, retry below
+      if (response.ok) return;
+    } catch (error) {
+      console.warn("Server not reachable yet:", error);
     }
-    banner.textContent = "Server wird gestartet … das kann bei kostenlosem Hosting bis zu einer Minute dauern.";
-    await new Promise((resolve) => setTimeout(resolve, HEALTH_RETRY_MS));
+    if (Date.now() - startedAt > timeoutMs) {
+      throw new TypeError("Server did not answer /health in time");
+    }
+    onWaiting();
+    await sleep(HEALTH_RETRY_MS);
   }
+}
+
+/** Wait for the backend and then load the method list. */
+async function connectToServer() {
+  const banner = $("server-banner");
+  await waitForServer(() => {
+    banner.textContent = "Server wird gestartet … das kann bei kostenlosem Hosting bis zu einer Minute dauern.";
+  });
   banner.className = "banner ok";
 
   state.methods = await (await fetch(`${API}/methods`)).json();
@@ -107,6 +130,40 @@ function initMonths() {
   });
 }
 
+/**
+ * Ask the server for the state of a job until it is done. Short connection problems are
+ * retried (the server may be restarting); a job the server forgot raises JobLostError.
+ */
+async function waitForJob(jobId) {
+  const startedAt = Date.now();
+  let failures = 0;
+  for (;;) {
+    let job;
+    try {
+      const response = await fetch(`${API}/jobs/${jobId}`);
+      if (response.status === 404) throw new JobLostError();
+      if (!response.ok) throw new Error(`Server meldet Fehler (HTTP ${response.status})`);
+      job = await response.json();
+      failures = 0;
+    } catch (error) {
+      if (error instanceof JobLostError) throw error;
+      failures += 1;
+      console.warn(`Status request failed (${failures}/${MAX_POLL_FAILURES}):`, error);
+      if (failures >= MAX_POLL_FAILURES) throw error;
+      setStatus(`Server nicht erreichbar, neuer Versuch (${failures}/${MAX_POLL_FAILURES}) …`);
+      await sleep(POLL_RETRY_MS);
+      continue;
+    }
+
+    if (job.status === "done") return job.result;
+    if (job.status === "failed") throw new Error(job.error);
+
+    const seconds = Math.round((Date.now() - startedAt) / 1000);
+    setStatus(`${job.status === "queued" ? "In der Warteschlange" : "Berechnung läuft"} … ${seconds} s`);
+    await sleep(POLL_INTERVAL_MS);
+  }
+}
+
 /** Start a job, poll until it is finished and display the outcome. */
 async function solve() {
   const request = buildSolveRequest({
@@ -120,9 +177,16 @@ async function solve() {
 
   state.running = true;
   updateSolveButton();
-  setStatus("Auftrag wird gesendet …");
 
   try {
+    // The server may have fallen asleep since the page was loaded: wake it up first
+    setStatus("Verbinde mit dem Server …");
+    await waitForServer(
+      () => setStatus("Server wird aufgeweckt … das kann bis zu einer Minute dauern."),
+      WAKE_UP_TIMEOUT_MS,
+    );
+
+    setStatus("Auftrag wird gesendet …");
     const response = await fetch(`${API}/solve`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -134,21 +198,15 @@ async function solve() {
     }
     const { job_id: jobId } = await response.json();
 
-    const startedAt = Date.now();
-    for (;;) {
-      const job = await (await fetch(`${API}/jobs/${jobId}`)).json();
-      if (job.status === "done") {
-        showResult(job.result);
-        setStatus("Fertig.");
-        break;
-      }
-      if (job.status === "failed") throw new Error(job.error);
-      const seconds = Math.round((Date.now() - startedAt) / 1000);
-      setStatus(`${job.status === "queued" ? "In der Warteschlange" : "Berechnung läuft"} … ${seconds} s`);
-      await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
-    }
+    showResult(await waitForJob(jobId));
+    setStatus("Fertig.");
   } catch (error) {
-    setStatus(`Fehler: ${error.message}`);
+    console.error("Solve failed:", error);
+    if (error instanceof JobLostError) {
+      setStatus("Fehler: Der Auftrag ging verloren (der Server wurde vermutlich neu gestartet). Bitte erneut starten.");
+    } else {
+      setStatus(`Fehler: ${friendlyErrorMessage(error)}`);
+    }
   } finally {
     state.running = false;
     updateSolveButton();
