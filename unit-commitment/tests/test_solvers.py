@@ -1,5 +1,5 @@
 """Unit tests for the solver modules (no HTTP involved)."""
-from solver.exact import count_decision_variables, load_data, solve_exact
+from solver.exact import count_decision_variables, estimate_exact_memory_mb, load_data, solve_exact
 from solver.priority_list import check_feasibility, solve_priority_list
 
 
@@ -32,6 +32,17 @@ def test_check_feasibility_explains_uncovered_demand(data_dir):
     reasons = check_feasibility(d, conv, nothing, off, [], [], [])
 
     assert any("Demand not covered" in reason for reason in reasons)
+
+
+def test_exact_memory_estimate_grows_with_scenario_and_horizon(data_dir):
+    # Measured peaks of real runs: large/week about 760 MB, large/month about 3300 MB
+    small_day = estimate_exact_memory_mb("small", 1, data_dir, "day")
+    large_week = estimate_exact_memory_mb("large", 1, data_dir, "week")
+    large_month = estimate_exact_memory_mb("large", 1, data_dir, "month")
+
+    assert small_day < 300
+    assert 600 < large_week < 1500
+    assert 2500 < large_month < 4500
 
 
 def test_exact_accepts_mip_gap_and_reports_metrics(data_dir):

@@ -93,6 +93,23 @@ def test_invalid_requests_are_rejected(payload, expected_status):
     assert response.status_code == expected_status
 
 
+def test_exact_run_too_big_for_the_server_memory_is_rejected(monkeypatch):
+    monkeypatch.setattr("solver.api.memory_limit_mb", lambda: 1000.0)
+
+    response = client.post("/solve", json={"method": "exact", "scenario": "large", "horizon": "month"})
+
+    assert response.status_code == 400
+    assert "Arbeitsspeicher" in response.json()["detail"]
+
+
+def test_heuristic_is_not_limited_by_the_memory_guard(monkeypatch):
+    monkeypatch.setattr("solver.api.memory_limit_mb", lambda: 1000.0)
+
+    response = client.post("/solve", json={"method": "priority_list", "scenario": "large", "horizon": "month"})
+
+    assert response.status_code == 202
+
+
 def test_cors_allows_browser_origin():
     response = client.options(
         "/solve",

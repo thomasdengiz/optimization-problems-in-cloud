@@ -19,8 +19,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from .exact         import HORIZONS, solve_exact
-from .jobs          import DATA_DIR, job_manager
+from .exact         import HORIZONS, estimate_exact_memory_mb, solve_exact
+from .jobs          import DATA_DIR, job_manager, logger, memory_limit_mb
 from .priority_list import solve_priority_list
 
 MAX_TIME_LIMIT = int(os.environ.get("MAX_TIME_LIMIT", "300"))
@@ -29,7 +29,11 @@ CORS_ORIGINS   = [o.strip() for o in os.environ.get("CORS_ORIGINS", "*").split("
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    """Stop the worker processes when the API shuts down."""
+    """Log the server configuration at startup; stop the worker processes at shutdown."""
+    logger.info(
+        "Server started: memory_limit_mb=%s workers=%s max_time_limit=%s cors_origins=%s",
+        memory_limit_mb(), os.environ.get("SOLVER_WORKERS", "2"), MAX_TIME_LIMIT, CORS_ORIGINS,
+    )
     yield
     job_manager.shutdown()
 
@@ -118,14 +122,32 @@ def solve(req: SolveRequest):
     if req.scenario not in METHODS[req.method]["scenarios"]:
         raise HTTPException(400, f"Method '{req.method}' not available for scenario '{req.scenario}'")
 
-    job_id = job_manager.submit(
-        method=req.method,
-        scenario=req.scenario,
-        month=req.month,
-        horizon=req.horizon,
-        time_limit=req.time_limit,
-        mip_gap=req.mip_gap,
-    )
+    # The exact model needs much memory for big scenarios. If the server clearly does not have
+    # enough, refuse early instead of letting the operating system kill the worker.
+    limit = memory_limit_mb()
+    if req.method == "exact" and limit is not None:
+        needed = estimate_exact_memory_mb(req.scenario, req.month, DATA_DIR, req.horizon)
+        if needed > limit:
+            raise HTTPException(
+                400,
+                f"Für diese Kombination braucht die exakte Methode etwa {needed:.0f} MB Arbeitsspeicher, "
+                f"der Server hat {limit:.0f} MB. Bitte ein kleineres Szenario, einen kürzeren Zeitraum "
+                "oder die Heuristik wählen.",
+            )
+
+    try:
+        job_id = job_manager.submit(
+            method=req.method,
+            scenario=req.scenario,
+            month=req.month,
+            horizon=req.horizon,
+            time_limit=req.time_limit,
+            mip_gap=req.mip_gap,
+        )
+    except Exception as error:
+        # An HTTPException keeps the CORS headers, so the browser can show the message
+        logger.exception("Could not start job")
+        raise HTTPException(503, f"Auftrag konnte nicht gestartet werden: {error}") from error
     return {"job_id": job_id, "status": "queued"}
 
 

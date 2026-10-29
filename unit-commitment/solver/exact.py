@@ -87,6 +87,18 @@ def load_data(scenario: str, month: int, data_dir: str, horizon: str = "day") ->
     }
 
 
+def estimate_exact_memory_mb(scenario: str, month: int, data_dir: str, horizon: str = "day") -> float:
+    """Roughly estimate the peak memory (MB) of the exact solve before building the model.
+
+    Based on measured runs: about 150 MB for Python and libraries plus about 0.0135 MB per
+    decision variable (large/week: 760 MB measured, large/month: 3300 MB measured).
+    """
+    data = load_data(scenario, month, data_dir, horizon)
+    n_storage = sum(1 for p in data["plants"] if p["type"] == "pump_storage")
+    counts = count_decision_variables(len(data["plants"]) - n_storage, n_storage, data["T"])
+    return 150 + 0.0135 * counts["total"]
+
+
 def solve_exact(
     scenario: str,
     month: int,

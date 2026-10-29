@@ -11,6 +11,7 @@ import os
 import time
 import uuid
 from concurrent.futures import Future, ProcessPoolExecutor
+from concurrent.futures.process import BrokenProcessPool
 
 from .exact import solve_exact
 from .priority_list import solve_priority_list
@@ -29,6 +30,35 @@ if not logger.handlers:
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
 MAX_JOBS_KEPT = 200  # oldest finished jobs are dropped beyond this number
+
+# Shown to the user when the operating system killed a worker process
+WORKER_KILLED_MESSAGE = (
+    "Der Rechenprozess wurde vom Betriebssystem beendet, vermutlich wegen zu wenig "
+    "Arbeitsspeicher auf dem Server. Bitte ein kleineres Szenario oder einen kürzeren "
+    "Zeitraum wählen."
+)
+
+
+def memory_limit_mb() -> float | None:
+    """Memory limit of the container in MB (read from the cgroup files), or None if unknown."""
+    for path in ("/sys/fs/cgroup/memory.max", "/sys/fs/cgroup/memory/memory.limit_in_bytes"):
+        try:
+            with open(path) as file:
+                raw = file.read().strip()
+        except OSError:
+            continue
+        if raw.isdigit() and int(raw) < 1 << 50:  # huge numbers mean "no limit"
+            return int(raw) / 1024 / 1024
+    return None
+
+
+def peak_memory_mb() -> float | None:
+    """Highest memory use of this process so far in MB (Linux only), or None if unknown."""
+    try:
+        import resource
+    except ImportError:  # Windows has no resource module
+        return None
+    return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024  # Linux reports KB
 
 
 def run_solve(
@@ -62,9 +92,11 @@ def run_solve(
     result["scenario"] = scenario
     result["horizon"] = horizon
     result["month"] = month
+    peak = peak_memory_mb()
     logger.info(
-        "Job finished: %s feasible=%s cost=%.0f duration=%.1fs",
+        "Job finished: %s feasible=%s cost=%.0f duration=%.1fs peak_memory_mb=%s",
         description, result["feasible"], result["total_cost_eur"], duration,
+        None if peak is None else round(peak),
     )
     return result
 
@@ -87,11 +119,20 @@ class JobManager:
             )
         return self._executor
 
-    def submit(self, **params) -> str:
-        """Start a job with the given run_solve parameters and return its job_id."""
+    def submit(self, target=run_solve, **params) -> str:
+        """Start a job (target is run_solve unless a test passes another function) and return its job_id.
+
+        If the worker pool is broken because a worker was killed earlier, a new pool is created.
+        """
         self._drop_old_jobs()
         job_id = uuid.uuid4().hex
-        self._jobs[job_id] = self._get_executor().submit(run_solve, **params)
+        try:
+            future = self._get_executor().submit(target, **params)
+        except BrokenProcessPool:
+            logger.error("Worker pool is broken (a worker was killed, probably out of memory). Creating a new pool.")
+            self._reset_executor()
+            future = self._get_executor().submit(target, **params)
+        self._jobs[job_id] = future
         logger.info("Job %s submitted (%d jobs stored)", job_id, len(self._jobs))
         return job_id
 
@@ -105,6 +146,9 @@ class JobManager:
             return {"job_id": job_id, "status": "running" if future.running() else "queued"}
 
         error = future.exception()
+        if isinstance(error, BrokenProcessPool):
+            logger.error("Job %s failed: a worker process was killed (probably out of memory)", job_id)
+            return {"job_id": job_id, "status": "failed", "error": WORKER_KILLED_MESSAGE}
         if error is not None:
             return {"job_id": job_id, "status": "failed", "error": f"{type(error).__name__}: {error}"}
         return {"job_id": job_id, "status": "done", "result": future.result()}
@@ -119,11 +163,15 @@ class JobManager:
                 del self._jobs[job_id]
                 excess -= 1
 
-    def shutdown(self) -> None:
-        """Stop the worker processes (called when the API shuts down)."""
+    def _reset_executor(self) -> None:
+        """Throw away the current (broken) process pool; a new one is created on the next use."""
         if self._executor is not None:
             self._executor.shutdown(wait=False, cancel_futures=True)
             self._executor = None
+
+    def shutdown(self) -> None:
+        """Stop the worker processes (called when the API shuts down)."""
+        self._reset_executor()
 
 
 job_manager = JobManager()
