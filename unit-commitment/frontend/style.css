@@ -4,8 +4,17 @@ body { margin: 0; font-family: system-ui, sans-serif; background: var(--bg); col
 header { padding: 1rem 2rem; background: var(--accent); color: #fff; display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; }
 header h1 { margin: 0 0 .25rem; }
 header p { margin: 0; opacity: .9; }
-.language label { margin: 0 0 .25rem; font-weight: 400; font-size: .85rem; }
-.language select { width: auto; }
+.language { position: relative; min-width: 130px; }
+.language > span { display: block; margin: 0 0 .25rem; font-weight: 400; font-size: .85rem; }
+.language-trigger { display: flex; align-items: center; gap: .5rem; width: auto; margin: 0; padding: .4rem .55rem; border: 1px solid rgb(255 255 255 / 45%); background: rgb(255 255 255 / 12%); }
+.language-trigger:hover, .language-trigger:focus-visible { background: rgb(255 255 255 / 22%); }
+.language-trigger img, .language-options img { display: block; width: 24px; height: 18px; object-fit: cover; border-radius: 2px; box-shadow: 0 0 0 1px rgb(0 0 0 / 15%); }
+.language-caret { margin-left: .25rem; }
+.language-options { position: absolute; z-index: 1000; top: 100%; right: 0; min-width: 100%; padding: .25rem; border: 1px solid var(--border); border-radius: 6px; background: #fff; box-shadow: 0 4px 12px rgb(0 0 0 / 18%); }
+.language-options[hidden] { display: none; }
+.language-options button { display: flex; align-items: center; gap: .5rem; width: 100%; margin: 0; padding: .45rem .5rem; border-radius: 4px; background: #fff; color: #1f2328; text-align: left; }
+.language-options button:hover, .language-options button:focus-visible { background: #f0f3f6; }
+.language-options button[aria-selected="true"] { font-weight: 700; }
 main { display: grid; grid-template-columns: minmax(300px, 420px) 1fr; gap: 1rem; padding: 1rem 2rem; }
 @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
 .panel { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.25rem; }

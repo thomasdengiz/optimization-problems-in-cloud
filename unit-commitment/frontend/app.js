@@ -136,11 +136,25 @@ function renderCountryInfo() {
     : t("country.hint");
 }
 
+/** Keep the custom language picker in sync with the selected language. */
+function renderLanguagePicker() {
+  const selected = document.querySelector(`[data-language="${state.language}"]`);
+  const trigger = $("language");
+  const triggerImage = trigger.querySelector("img");
+  const triggerText = trigger.querySelector("span");
+  triggerImage.src = selected.querySelector("img").getAttribute("src");
+  triggerImage.alt = selected.querySelector("img").alt;
+  triggerText.textContent = selected.querySelector("span").textContent;
+  document.querySelectorAll("[data-language]").forEach((option) => {
+    option.setAttribute("aria-selected", String(option === selected));
+  });
+}
+
 /** Apply the selected language to the whole page (static texts, dropdowns, status, results). */
 function applyLanguage() {
   document.documentElement.lang = state.language;
   document.title = t("page.title");
-  $("language").value = state.language;
+  renderLanguagePicker();
   for (const element of document.querySelectorAll("[data-i18n]")) {
     element.textContent = t(element.dataset.i18n);
   }
@@ -416,10 +430,55 @@ function drawChart(canvas, profile) {
   });
 }
 
-$("language").addEventListener("change", () => {
-  state.language = $("language").value;
-  localStorage.setItem(LANGUAGE_STORAGE_KEY, state.language);
-  applyLanguage();
+const languageTrigger = $("language");
+const languageOptions = $("language-options");
+const languageOptionButtons = [...languageOptions.querySelectorAll('[role="option"]')];
+
+function closeLanguageOptions(restoreFocus = false) {
+  languageOptions.hidden = true;
+  languageTrigger.setAttribute("aria-expanded", "false");
+  if (restoreFocus) languageTrigger.focus();
+}
+
+function openLanguageOptions(focusSelected = false) {
+  languageOptions.hidden = false;
+  languageTrigger.setAttribute("aria-expanded", "true");
+  if (focusSelected) languageOptionButtons.find((option) => option.dataset.language === state.language)?.focus();
+}
+
+languageTrigger.addEventListener("click", () => {
+  if (languageOptions.hidden) openLanguageOptions();
+  else closeLanguageOptions();
+});
+languageTrigger.addEventListener("keydown", (event) => {
+  if (["ArrowDown", "ArrowUp", "Enter", " "].includes(event.key)) {
+    event.preventDefault();
+    openLanguageOptions(true);
+  }
+});
+languageOptionButtons.forEach((option, index) => {
+  option.addEventListener("click", () => {
+    state.language = option.dataset.language;
+    localStorage.setItem(LANGUAGE_STORAGE_KEY, state.language);
+    applyLanguage();
+    closeLanguageOptions(true);
+  });
+  option.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeLanguageOptions(true);
+    } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const step = event.key === "ArrowDown" ? 1 : -1;
+      languageOptionButtons[(index + step + languageOptionButtons.length) % languageOptionButtons.length].focus();
+    } else if (event.key === "Home" || event.key === "End") {
+      event.preventDefault();
+      languageOptionButtons[event.key === "Home" ? 0 : languageOptionButtons.length - 1].focus();
+    }
+  });
+});
+document.addEventListener("click", (event) => {
+  if (!event.target.closest(".language")) closeLanguageOptions();
 });
 $("method").addEventListener("change", () => { renderInfoTexts(); updateSolveButton(); });
 $("scenario").addEventListener("change", renderInfoTexts);

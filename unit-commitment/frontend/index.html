@@ -15,11 +15,21 @@
       <p data-i18n="page.subtitle"></p>
     </div>
     <div class="language">
-      <label for="language" data-i18n="language.label"></label>
-      <select id="language" data-testid="language">
-        <option value="de">Deutsch</option>
-        <option value="en">English</option>
-      </select>
+      <span id="language-label" data-i18n="language.label"></span>
+      <button id="language" data-testid="language" class="language-trigger" type="button"
+        aria-labelledby="language-label" aria-haspopup="listbox" aria-expanded="false">
+        <img src="flags/de.svg" alt="Flag of Germany">
+        <span>Deutsch</span>
+        <span class="language-caret" aria-hidden="true">▾</span>
+      </button>
+      <div id="language-options" class="language-options" role="listbox" aria-labelledby="language-label" hidden>
+        <button type="button" role="option" data-language="de" aria-selected="true">
+          <img src="flags/de.svg" alt="Flag of Germany"><span>Deutsch</span>
+        </button>
+        <button type="button" role="option" data-language="en" aria-selected="false">
+          <img src="flags/en.svg" alt="Flag of the United Kingdom"><span>English</span>
+        </button>
+      </div>
     </div>
   </header>
 

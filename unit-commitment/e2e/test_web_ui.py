@@ -95,9 +95,11 @@ def test_language_can_be_switched_and_is_remembered(app_page: Page):
     select_germany(app_page)
     app_page.get_by_test_id("month").select_option("3")
 
-    app_page.get_by_test_id("language").select_option("en")
+    app_page.get_by_test_id("language").click()
+    app_page.locator('[data-language="en"]').click()
 
     expect(app_page.get_by_test_id("solve-button")).to_have_text("Start optimization")
+    expect(app_page.get_by_test_id("language").locator("img")).to_have_attribute("alt", "Flag of the United Kingdom")
     expect(app_page.get_by_test_id("country-info")).to_contain_text("Germany")
     expect(app_page.get_by_test_id("month-info")).to_contain_text("March")
     assert app_page.get_by_test_id("month").input_value() == "3"   # selection survives the switch
@@ -112,7 +114,8 @@ def test_results_follow_the_language(app_page: Page):
     app_page.get_by_test_id("solve-button").click()
     expect(app_page.get_by_test_id("r-feasible")).to_have_text("ja", timeout=60000)
 
-    app_page.get_by_test_id("language").select_option("en")
+    app_page.get_by_test_id("language").click()
+    app_page.locator('[data-language="en"]').click()
 
     expect(app_page.get_by_test_id("r-feasible")).to_have_text("yes")
     expect(app_page.get_by_test_id("day-cost")).to_contain_text("Cost")
