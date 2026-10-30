@@ -113,6 +113,7 @@ def test_results_follow_the_language(app_page: Page):
     select_germany(app_page)
     app_page.get_by_test_id("solve-button").click()
     expect(app_page.get_by_test_id("r-feasible")).to_have_text("ja", timeout=60000)
+    expect(app_page.get_by_test_id("computing")).to_be_hidden()
 
     app_page.get_by_test_id("language").click()
     app_page.locator('[data-language="en"]').click()

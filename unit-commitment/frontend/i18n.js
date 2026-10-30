@@ -56,6 +56,7 @@ export const TRANSLATIONS = {
     "info.month.default": "Last-, Wind- und Solardaten für {month} 2023 (ENTSO-E).",
 
     "result.heading": "Ergebnis",
+    "result.computing": "Ergebnisse werden berechnet",
     "result.none": "Noch kein Ergebnis.",
     "result.cost": "Gesamtkosten",
     "result.solverTime": "Solver-Zeit",
@@ -148,6 +149,7 @@ export const TRANSLATIONS = {
     "info.month.default": "Load, wind and solar data for {month} 2023 (ENTSO-E).",
 
     "result.heading": "Result",
+    "result.computing": "Results are being calculated",
     "result.none": "No result yet.",
     "result.cost": "Total cost",
     "result.solverTime": "Solver time",

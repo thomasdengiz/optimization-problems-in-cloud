@@ -25,6 +25,11 @@ button { margin-top: 1rem; width: 100%; padding: .7rem; border: 0; border-radius
 button:disabled { background: #9aa5b1; cursor: not-allowed; }
 .hint { color: #57606a; font-size: .85rem; margin: .25rem 0; }
 .info { color: #57606a; font-size: .85rem; margin: .25rem 0; min-height: 1.2rem; }
+.computing { display: flex; align-items: center; gap: .6rem; color: var(--accent); font-weight: 600; margin: .25rem 0 .5rem; }
+.spinner { width: 18px; height: 18px; flex: 0 0 18px; border: 3px solid #cfe9dd; border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2.4s; } }
+.computing[hidden] { display: none; }
 .note { background: #fff8c5; border-left: 3px solid #d4a72c; border-radius: 4px; padding: .4rem .7rem; font-size: .9rem; }
 option:disabled { color: #9aa5b1; }
 .banner { padding: .5rem 2rem; background: #fff8c5; border-bottom: 1px solid #d4a72c; }

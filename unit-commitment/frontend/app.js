@@ -298,6 +298,7 @@ async function solve() {
   $("days").replaceChildren();
   $("result").hidden = true;
   $("no-result").hidden = false;
+  $("computing").hidden = false;
 
   try {
     // The server may have fallen asleep since the page was loaded: wake it up first
@@ -321,6 +322,7 @@ async function solve() {
     setErrorStatus(error);
   } finally {
     state.running = false;
+    $("computing").hidden = true;
     updateSolveButton();
   }
 }
