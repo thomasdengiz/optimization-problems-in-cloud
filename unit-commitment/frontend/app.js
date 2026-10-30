@@ -31,6 +31,12 @@ const SERIES_ICONS = {
   load: "icons/load.svg",
 };
 
+// Global Chart.js look: system font and a softer grey for text
+Chart.defaults.font.family = "system-ui, sans-serif";
+Chart.defaults.color = "#57606a";
+// Colour of the load line and its legend swatch
+const LOAD_COLOR = "#1f2328";
+
 const $ = (id) => document.getElementById(id);
 const state = {
   language: detectLanguage(localStorage.getItem(LANGUAGE_STORAGE_KEY), navigator.language),
@@ -407,7 +413,7 @@ function renderDays(locale) {
     section.appendChild(buildLegend(profile));
     container.appendChild(section);
 
-    state.charts.push(drawChart(canvas, profile));
+    state.charts.push(drawChart(canvas, profile, locale));
   });
 }
 
@@ -417,7 +423,7 @@ function buildLegend(profile) {
   list.className = "legend";
   const entries = [
     ...profile.stacks.map((stack) => ({ key: stack.key, color: stack.color })),
-    { key: "load", color: "#000" },
+    { key: "load", color: LOAD_COLOR },
   ];
   for (const entry of entries) {
     const item = document.createElement("li");
@@ -442,38 +448,128 @@ function buildLegend(profile) {
 }
 
 /** Draw the stacked generation chart with the demand line for one day. */
-function drawChart(canvas, profile) {
+function drawChart(canvas, profile, locale) {
   const datasets = profile.stacks.map((stack) => ({
     type: "bar",
+    order: 1,                       // higher order = drawn behind the load line
     label: t(`series.${stack.key}`),
+    seriesKey: stack.key,
     data: stack.values,
     backgroundColor: stack.color,
     stack: "supply",
     barPercentage: 1,
     categoryPercentage: 1,
+    borderWidth: 0,
   }));
   datasets.push({
     type: "line",
+    order: 0,                       // lower order = drawn on top of the bars
     label: t("series.load"),
+    seriesKey: "load",
     data: profile.load,
-    borderColor: "#000",
-    backgroundColor: "#000",
-    borderWidth: 2,
+    borderColor: LOAD_COLOR,
+    backgroundColor: LOAD_COLOR,
+    borderWidth: 2.5,
     pointRadius: 0,
+    pointHoverRadius: 4,
   });
+
+  // The tooltip is a separate HTML card (it can show icons), placed inside the chart box.
+  const tooltip = document.createElement("div");
+  tooltip.className = "chart-tooltip";
+  tooltip.hidden = true;
+  canvas.parentElement.appendChild(tooltip);
 
   return new Chart(canvas, {
     data: { labels: profile.labels, datasets },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { display: false } },   // the HTML legend from buildLegend() is used instead
+      interaction: { mode: "index", intersect: false },   // hovering an hour shows all its series
+      plugins: {
+        legend: { display: false },   // the HTML legend from buildLegend() is used instead
+        tooltip: {
+          enabled: false,             // replaced by the HTML card below
+          external: (context) => renderTooltip(tooltip, context, locale),
+        },
+      },
       scales: {
-        x: { stacked: true },
-        y: { stacked: true, title: { display: true, text: t("profile.axis") } },
+        x: {
+          stacked: true,
+          border: { display: false },
+          grid: { display: false },
+          ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 12 },
+        },
+        y: {
+          stacked: true,
+          border: { display: false },
+          grid: { color: "#eaeef2" },
+          ticks: { callback: (value) => formatNumber(value, 0, locale) },
+          title: { display: true, text: t("profile.unit") },
+        },
       },
     },
   });
+}
+
+/**
+ * Fill the tooltip card for the hovered hour: title, then every series that has a value in
+ * this hour (colour, icon, name, value with unit). The load is always listed at the end.
+ */
+function renderTooltip(element, context, locale) {
+  const { chart, tooltip } = context;
+  if (tooltip.opacity === 0 || tooltip.dataPoints.length === 0) {
+    element.hidden = true;
+    return;
+  }
+
+  const isLoad = (point) => point.dataset.seriesKey === "load";
+  const rows = tooltip.dataPoints.filter((point) => isLoad(point) || Math.abs(point.raw) >= 0.05);
+  rows.sort((a, b) => Number(isLoad(a)) - Number(isLoad(b)));   // load last
+
+  element.replaceChildren();
+  const title = document.createElement("div");
+  title.className = "chart-tooltip-title";
+  title.textContent = tooltip.title.join(" ");
+  element.appendChild(title);
+
+  for (const point of rows) {
+    const { dataset } = point;
+    const row = document.createElement("div");
+    row.className = isLoad(point) ? "chart-tooltip-row is-load" : "chart-tooltip-row";
+
+    const swatch = document.createElement("span");
+    swatch.className = "swatch";
+    swatch.style.backgroundColor = dataset.backgroundColor;
+    row.appendChild(swatch);
+
+    if (SERIES_ICONS[dataset.seriesKey]) {
+      const icon = document.createElement("img");
+      icon.src = SERIES_ICONS[dataset.seriesKey];
+      icon.alt = "";
+      icon.width = 16;
+      icon.height = 16;
+      row.appendChild(icon);
+    }
+
+    const name = document.createElement("span");
+    name.className = "name";
+    name.textContent = dataset.label;
+    const value = document.createElement("span");
+    value.className = "value";
+    value.textContent = `${formatNumber(point.raw, 1, locale)} ${t("profile.unit")}`;
+    row.append(name, value);
+    element.appendChild(row);
+  }
+
+  // Place the card next to the hovered point, on the left side when near the right edge.
+  element.hidden = false;
+  const gap = 14;
+  const { caretX, caretY } = tooltip;
+  const left = caretX > chart.width / 2 ? caretX - element.offsetWidth - gap : caretX + gap;
+  const top = Math.min(Math.max(caretY - element.offsetHeight / 2, 0), chart.height - element.offsetHeight);
+  element.style.left = `${Math.max(left, 0)}px`;
+  element.style.top = `${Math.max(top, 0)}px`;
 }
 
 const languageTrigger = $("language");

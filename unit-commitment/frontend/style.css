@@ -47,7 +47,16 @@ option:disabled { color: #9aa5b1; }
 .day h4 { margin: 0 0 .4rem; display: flex; justify-content: space-between; flex-wrap: wrap; gap: .5rem; }
 .day-cost { font-weight: 400; color: #57606a; }
 .chart-box { position: relative; height: 300px; }
-.legend { list-style: none; display: flex; flex-wrap: wrap; gap: .3rem .9rem; margin: .5rem 0 0; padding: 0; font-size: .85rem; }
-.legend li { display: flex; align-items: center; gap: .35rem; }
+.legend { list-style: none; display: flex; flex-wrap: wrap; gap: .4rem; margin: .6rem 0 0; padding: 0; font-size: .85rem; }
+.legend li { display: flex; align-items: center; gap: .35rem; padding: .2rem .6rem .2rem .45rem; border: 1px solid var(--border); border-radius: 999px; background: #fff; }
 .legend .swatch { width: 12px; height: 12px; border-radius: 2px; flex: 0 0 12px; }
 .legend img { width: 16px; height: 16px; }
+.chart-tooltip { position: absolute; z-index: 2; top: 0; left: 0; pointer-events: none; min-width: 200px; padding: .5rem .7rem; border: 1px solid var(--border); border-radius: 8px; background: rgb(255 255 255 / 97%); box-shadow: 0 6px 18px rgb(31 35 40 / 14%); font-size: .85rem; }
+.chart-tooltip[hidden] { display: none; }
+.chart-tooltip-title { font-weight: 600; margin-bottom: .3rem; }
+.chart-tooltip-row { display: flex; align-items: center; gap: .4rem; padding: .12rem 0; }
+.chart-tooltip-row .swatch { width: 10px; height: 10px; flex: 0 0 10px; border-radius: 3px; }
+.chart-tooltip-row img { width: 16px; height: 16px; flex: 0 0 16px; }
+.chart-tooltip-row .name { flex: 1; }
+.chart-tooltip-row .value { white-space: nowrap; font-weight: 600; font-variant-numeric: tabular-nums; }
+.chart-tooltip-row.is-load { margin-top: .3rem; padding-top: .35rem; border-top: 1px solid var(--border); }

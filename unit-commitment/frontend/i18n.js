@@ -73,6 +73,7 @@ export const TRANSLATIONS = {
     "profile.day": "Tag {n} – {date}",
     "profile.cost": "Kosten: {cost}",
     "profile.axis": "MW",
+    "profile.unit": "MW",
 
     "series.hard_coal": "Steinkohle",
     "series.lignite": "Braunkohle",
@@ -166,6 +167,7 @@ export const TRANSLATIONS = {
     "profile.day": "Day {n} – {date}",
     "profile.cost": "Cost: {cost}",
     "profile.axis": "MW",
+    "profile.unit": "MW",
 
     "series.hard_coal": "Hard coal",
     "series.lignite": "Lignite",
