@@ -18,6 +18,18 @@ const POLL_RETRY_MS = 2000;
 const LANGUAGE_STORAGE_KEY = "uc-language";
 // Only these countries can be selected on the map (the data exists only for Germany so far)
 const SELECTABLE_COUNTRIES = ["DE"];
+// Icon shown in the chart legend for each series key (files in frontend/icons/)
+const SERIES_ICONS = {
+  hard_coal: "icons/hard_coal.svg",
+  lignite: "icons/lignite.svg",
+  gas: "icons/gas.svg",
+  biomass: "icons/biomass.svg",
+  wind: "icons/wind.svg",
+  pv: "icons/pv.svg",
+  pump_turbining: "icons/pump_turbining.svg",
+  pump_charging: "icons/pump_charging.svg",
+  load: "icons/load.svg",
+};
 
 const $ = (id) => document.getElementById(id);
 const state = {
@@ -392,10 +404,41 @@ function renderDays(locale) {
     const canvas = document.createElement("canvas");
     box.appendChild(canvas);
     section.appendChild(box);
+    section.appendChild(buildLegend(profile));
     container.appendChild(section);
 
     state.charts.push(drawChart(canvas, profile));
   });
+}
+
+/** HTML legend under a chart: colour swatch, icon and name for each series (follows the language). */
+function buildLegend(profile) {
+  const list = document.createElement("ul");
+  list.className = "legend";
+  const entries = [
+    ...profile.stacks.map((stack) => ({ key: stack.key, color: stack.color })),
+    { key: "load", color: "#000" },
+  ];
+  for (const entry of entries) {
+    const item = document.createElement("li");
+    const swatch = document.createElement("span");
+    swatch.className = "swatch";
+    swatch.style.backgroundColor = entry.color;
+    item.appendChild(swatch);
+    if (SERIES_ICONS[entry.key]) {
+      const icon = document.createElement("img");
+      icon.src = SERIES_ICONS[entry.key];
+      icon.alt = "";
+      icon.width = 16;
+      icon.height = 16;
+      item.appendChild(icon);
+    }
+    const name = document.createElement("span");
+    name.textContent = t(`series.${entry.key}`);
+    item.appendChild(name);
+    list.appendChild(item);
+  }
+  return list;
 }
 
 /** Draw the stacked generation chart with the demand line for one day. */
@@ -424,6 +467,7 @@ function drawChart(canvas, profile) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      plugins: { legend: { display: false } },   // the HTML legend from buildLegend() is used instead
       scales: {
         x: { stacked: true },
         y: { stacked: true, title: { display: true, text: t("profile.axis") } },
