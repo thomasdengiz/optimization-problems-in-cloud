@@ -15,7 +15,7 @@ select, input { width: 100%; padding: .45rem; border: 1px solid var(--border); b
 button { margin-top: 1rem; width: 100%; padding: .7rem; border: 0; border-radius: 6px; background: var(--accent); color: #fff; font-size: 1rem; cursor: pointer; }
 button:disabled { background: #9aa5b1; cursor: not-allowed; }
 .hint { color: #57606a; font-size: .85rem; margin: .25rem 0; }
-.info { color: #1f2328; background: #ddf4ff; border-left: 3px solid #0969da; border-radius: 4px; font-size: .85rem; margin: .35rem 0; padding: .35rem .6rem; min-height: 1.2rem; }
+.info { color: #57606a; font-size: .85rem; margin: .25rem 0; min-height: 1.2rem; }
 .note { background: #fff8c5; border-left: 3px solid #d4a72c; border-radius: 4px; padding: .4rem .7rem; font-size: .9rem; }
 option:disabled { color: #9aa5b1; }
 .banner { padding: .5rem 2rem; background: #fff8c5; border-bottom: 1px solid #d4a72c; }

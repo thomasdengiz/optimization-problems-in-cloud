@@ -49,6 +49,10 @@ export const TRANSLATIONS = {
     "info.scenario.small": "Verkleinertes System (etwa 1/8 des deutschen Kraftwerksparks, 20 Anlagen).",
     "info.scenario.medium": "Mittleres System (etwa die Hälfte des deutschen Kraftwerksparks, 80 Anlagen).",
     "info.scenario.large": "Vollständiges System (160 Anlagen). Exakte Läufe über lange Zeiträume brauchen viel Rechenzeit und Speicher.",
+    "info.horizon.day": "24 Stunden eines repräsentativen Tages.",
+    "info.horizon.week": "168 Stunden (7 Tage) als zusammenhängender Zeitraum.",
+    "info.horizon.month": "672 Stunden (28 Tage) als zusammenhängender Zeitraum. Bei der exakten Methode oft sehr rechenintensiv.",
+    "info.horizon.default": "Der gewählte Zeitraum bestimmt Modellgröße, Laufzeit und Speicherbedarf.",
     "info.month.default": "Last-, Wind- und Solardaten für {month} 2023 (ENTSO-E).",
 
     "result.heading": "Ergebnis",
@@ -137,6 +141,10 @@ export const TRANSLATIONS = {
     "info.scenario.small": "Scaled-down system (about 1/8 of the German power plant fleet, 20 plants).",
     "info.scenario.medium": "Medium system (about half of the German power plant fleet, 80 plants).",
     "info.scenario.large": "Full system (160 plants). Exact runs over long periods need a lot of computing time and memory.",
+    "info.horizon.day": "24 hours of one representative day.",
+    "info.horizon.week": "168 hours (7 days) as one continuous period.",
+    "info.horizon.month": "672 hours (28 days) as one continuous period. Often very demanding for the exact method.",
+    "info.horizon.default": "The selected period determines model size, run time and memory demand.",
     "info.month.default": "Load, wind and solar data for {month} 2023 (ENTSO-E).",
 
     "result.heading": "Result",

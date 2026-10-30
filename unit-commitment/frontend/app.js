@@ -124,6 +124,7 @@ function renderInfoTexts() {
   const method = $("method").value;
   $("method-info").textContent = method ? infoText(state.language, "method", method) : "";
   $("scenario-info").textContent = infoText(state.language, "scenario", $("scenario").value);
+  $("horizon-info").textContent = infoText(state.language, "horizon", $("horizon").value);
   const monthName = MONTH_NAMES[state.language][Number($("month").value) - 1];
   $("month-info").textContent = infoText(state.language, "month", $("month").value, { month: monthName });
 }
@@ -275,6 +276,14 @@ async function solve() {
 
   state.running = true;
   updateSolveButton();
+
+  // Hide the previous result immediately when a new run starts.
+  state.result = null;
+  state.charts.forEach((chart) => chart.destroy());
+  state.charts = [];
+  $("days").replaceChildren();
+  $("result").hidden = true;
+  $("no-result").hidden = false;
 
   try {
     // The server may have fallen asleep since the page was loaded: wake it up first
