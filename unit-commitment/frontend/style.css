@@ -1,9 +1,11 @@
 :root { --accent: #0b6e4f; --border: #d0d7de; --bg: #f6f8fa; }
 * { box-sizing: border-box; }
 body { margin: 0; font-family: system-ui, sans-serif; background: var(--bg); color: #1f2328; }
-header { padding: 1rem 2rem; background: var(--accent); color: #fff; }
+header { padding: 1rem 2rem; background: var(--accent); color: #fff; display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; }
 header h1 { margin: 0 0 .25rem; }
 header p { margin: 0; opacity: .9; }
+.language label { margin: 0 0 .25rem; font-weight: 400; font-size: .85rem; }
+.language select { width: auto; }
 main { display: grid; grid-template-columns: minmax(300px, 420px) 1fr; gap: 1rem; padding: 1rem 2rem; }
 @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
 .panel { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.25rem; }
@@ -13,6 +15,9 @@ select, input { width: 100%; padding: .45rem; border: 1px solid var(--border); b
 button { margin-top: 1rem; width: 100%; padding: .7rem; border: 0; border-radius: 6px; background: var(--accent); color: #fff; font-size: 1rem; cursor: pointer; }
 button:disabled { background: #9aa5b1; cursor: not-allowed; }
 .hint { color: #57606a; font-size: .85rem; margin: .25rem 0; }
+.info { color: #1f2328; background: #ddf4ff; border-left: 3px solid #0969da; border-radius: 4px; font-size: .85rem; margin: .35rem 0; padding: .35rem .6rem; min-height: 1.2rem; }
+.note { background: #fff8c5; border-left: 3px solid #d4a72c; border-radius: 4px; padding: .4rem .7rem; font-size: .9rem; }
+option:disabled { color: #9aa5b1; }
 .banner { padding: .5rem 2rem; background: #fff8c5; border-bottom: 1px solid #d4a72c; }
 .banner.ok { display: none; }
 .banner.error { background: #ffebe9; border-color: #cf222e; }
@@ -24,4 +29,7 @@ button:disabled { background: #9aa5b1; cursor: not-allowed; }
 .feasible-yes { color: #1a7f37; }
 .feasible-no { color: #cf222e; }
 #reasons { color: #cf222e; }
-.chart-box { position: relative; height: 380px; }
+.day { border-top: 1px solid var(--border); padding-top: .6rem; margin-top: .8rem; }
+.day h4 { margin: 0 0 .4rem; display: flex; justify-content: space-between; flex-wrap: wrap; gap: .5rem; }
+.day-cost { font-weight: 400; color: #57606a; }
+.chart-box { position: relative; height: 300px; }

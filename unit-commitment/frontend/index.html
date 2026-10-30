@@ -8,84 +8,86 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <!-- Elements with data-i18n get their text from i18n.js in the selected language -->
   <header>
-    <h1>Unit Commitment</h1>
-    <p>Kraftwerkseinsatzplanung: Methode, Land, Szenario und Zeitraum wählen und die Optimierung in der Cloud starten.</p>
+    <div>
+      <h1 data-i18n="page.title"></h1>
+      <p data-i18n="page.subtitle"></p>
+    </div>
+    <div class="language">
+      <label for="language" data-i18n="language.label"></label>
+      <select id="language" data-testid="language">
+        <option value="de">Deutsch</option>
+        <option value="en">English</option>
+      </select>
+    </div>
   </header>
 
-  <div id="server-banner" data-testid="server-banner" class="banner">Verbinde mit dem Server …</div>
+  <div id="server-banner" data-testid="server-banner" class="banner" data-i18n="banner.starting"></div>
 
   <main>
     <section class="panel" id="inputs">
-      <h2>Eingaben</h2>
+      <h2 data-i18n="inputs.heading"></h2>
 
-      <label>Land (Karte)</label>
+      <label data-i18n="country.label"></label>
       <div id="map" data-testid="map"></div>
-      <p id="country-info" data-testid="country-info" class="hint">Bitte Deutschland auf der Karte anklicken.</p>
+      <p id="country-info" data-testid="country-info" class="hint"></p>
 
-      <label for="method">Optimierungsmethode</label>
+      <label for="method" data-i18n="method.label"></label>
       <select id="method" data-testid="method"></select>
+      <p id="method-info" data-testid="method-info" class="info"></p>
 
       <div id="params-exact" class="params">
-        <label for="time-limit">Zeitlimit des Solvers (Sekunden)</label>
+        <label for="time-limit" data-i18n="timeLimit.label"></label>
         <input id="time-limit" data-testid="time-limit" type="number" min="1" max="300" value="60">
-        <p class="hint">
-          Das Zeitlimit gilt nur für die reine Solver-Zeit (HiGHS). Modellaufbau und Datenverarbeitung
-          kommen dazu, die Gesamtzeit kann daher höher sein.
-        </p>
-        <label for="mip-gap">MIP-Gap (%)</label>
+        <p class="hint" data-i18n="timeLimit.hint"></p>
+        <label for="mip-gap" data-i18n="mipGap.label"></label>
         <input id="mip-gap" data-testid="mip-gap" type="number" min="0" max="100" step="0.1" value="1">
-        <p class="hint">Der Solver stoppt, sobald die Lücke zwischen bester Lösung und Schranke kleiner ist.</p>
+        <p class="hint" data-i18n="mipGap.hint"></p>
       </div>
 
-      <div id="params-placeholder" class="params" hidden>
-        <p class="hint" data-testid="placeholder-note">Diese Methode ist noch nicht implementiert. Parameter folgen.</p>
-        <label>Populations-/Schwarmgröße</label>
-        <input type="number" value="50" disabled>
-        <label>Generationen/Iterationen</label>
-        <input type="number" value="100" disabled>
-      </div>
-
-      <label for="scenario">Szenario</label>
+      <label for="scenario" data-i18n="scenario.label"></label>
       <select id="scenario" data-testid="scenario">
-        <option value="small">klein</option>
-        <option value="medium">mittel</option>
-        <option value="large">groß</option>
+        <option value="small" data-i18n="scenario.small"></option>
+        <option value="medium" data-i18n="scenario.medium"></option>
+        <option value="large" data-i18n="scenario.large"></option>
       </select>
+      <p id="scenario-info" data-testid="scenario-info" class="info"></p>
 
-      <label for="horizon">Zeitraum</label>
+      <label for="horizon" data-i18n="horizon.label"></label>
       <select id="horizon" data-testid="horizon">
-        <option value="day">Tag</option>
-        <option value="week">Woche</option>
-        <option value="month">Monat</option>
+        <option value="day" data-i18n="horizon.day"></option>
+        <option value="week" data-i18n="horizon.week"></option>
+        <option value="month" data-i18n="horizon.month"></option>
       </select>
 
-      <label for="month">Monat</label>
+      <label for="month" data-i18n="month.label"></label>
       <select id="month" data-testid="month"></select>
+      <p id="month-info" data-testid="month-info" class="info"></p>
 
-      <button id="solve" data-testid="solve-button" disabled>Optimierung starten</button>
+      <button id="solve" data-testid="solve-button" data-i18n="solve.button" disabled></button>
       <p id="status" data-testid="status" class="hint" role="status"></p>
     </section>
 
     <section class="panel" id="outputs">
-      <h2>Ergebnis</h2>
-      <p id="no-result" class="hint">Noch kein Ergebnis.</p>
+      <h2 data-i18n="result.heading"></h2>
+      <p id="no-result" class="hint" data-i18n="result.none"></p>
 
       <div id="result" hidden>
         <div class="cards">
-          <div class="card"><span>Gesamtkosten</span><strong id="r-cost" data-testid="r-cost"></strong></div>
-          <div class="card"><span>Solver-Zeit</span><strong id="r-solver-time" data-testid="r-solver-time"></strong></div>
-          <div class="card"><span>Gesamtzeit</span><strong id="r-total-time" data-testid="r-total-time"></strong></div>
-          <div class="card"><span>Entscheidungsvariablen</span><strong id="r-vars" data-testid="r-vars"></strong></div>
-          <div class="card"><span>MIP-Gap</span><strong id="r-gap" data-testid="r-gap"></strong></div>
-          <div class="card"><span>Zulässig (feasible)</span><strong id="r-feasible" data-testid="r-feasible"></strong></div>
+          <div class="card"><span data-i18n="result.cost"></span><strong id="r-cost" data-testid="r-cost"></strong></div>
+          <div class="card"><span data-i18n="result.solverTime"></span><strong id="r-solver-time" data-testid="r-solver-time"></strong></div>
+          <div class="card"><span data-i18n="result.buildTime"></span><strong id="r-build-time" data-testid="r-build-time"></strong></div>
+          <div class="card"><span data-i18n="result.totalTime"></span><strong id="r-total-time" data-testid="r-total-time"></strong></div>
+          <div class="card"><span data-i18n="result.variables"></span><strong id="r-vars" data-testid="r-vars"></strong></div>
+          <div class="card"><span data-i18n="result.gap"></span><strong id="r-gap" data-testid="r-gap"></strong></div>
+          <div class="card"><span data-i18n="result.feasible"></span><strong id="r-feasible" data-testid="r-feasible"></strong></div>
         </div>
+        <p id="limit-note" data-testid="limit-note" class="note" data-i18n="result.limitReached" hidden></p>
         <ul id="reasons" data-testid="reasons"></ul>
 
-        <h3>Lastprofil</h3>
-        <label for="day">Tag</label>
-        <select id="day" data-testid="day"></select>
-        <div class="chart-box"><canvas id="chart" data-testid="chart"></canvas></div>
+        <h3 data-i18n="profile.heading"></h3>
+        <div id="days" data-testid="days"></div>
       </div>
     </section>
   </main>

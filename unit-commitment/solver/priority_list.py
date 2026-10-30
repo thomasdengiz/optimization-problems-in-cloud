@@ -12,7 +12,7 @@ The heuristic is checked afterwards against the same constraints as the exact
 model (see `check_feasibility`). If any constraint is violated, the reasons are
 returned in `infeasibility_reasons`.
 """
-from .exact import count_decision_variables, load_data
+from .exact import count_decision_variables, hourly_generation_cost, load_data
 
 TOLERANCE     = 1e-6  # numerical tolerance in MW / MWh
 FINAL_SOC_MIN = 0.49  # same band as the exact model
@@ -331,6 +331,9 @@ def solve_priority_list(
         "objective_upper_bound": None,
         "mip_gap":        None,
         "solve_time_seconds": None,
+        "model_build_seconds": None,
+        "stopped_at_time_limit": False,
+        "hourly_cost_eur": hourly_generation_cost(conv, generation),
         "num_variables":  counts["total"],
         "num_binary_variables": counts["binary"],
         "num_continuous_variables": counts["continuous"],

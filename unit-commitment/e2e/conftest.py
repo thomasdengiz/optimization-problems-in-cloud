@@ -52,6 +52,12 @@ def servers():
         process.terminate()
 
 
+@pytest.fixture(scope="session")
+def browser_context_args(browser_context_args):
+    """Open the browser with a German locale, so the page starts in German (as the tests expect)."""
+    return {**browser_context_args, "locale": "de-DE"}
+
+
 @pytest.fixture
 def app_page(page):
     """Open the web page against the local backend and wait until the methods are loaded.

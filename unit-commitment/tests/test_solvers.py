@@ -52,3 +52,25 @@ def test_exact_accepts_mip_gap_and_reports_metrics(data_dir):
     assert result["num_variables"] > 0
     assert result["num_binary_variables"] > 0
     assert result["mip_gap"] is None or result["mip_gap"] <= 0.05 + 1e-9
+
+
+def test_hourly_costs_add_up_to_total_cost(data_dir):
+    for result in (
+        solve_priority_list("small", 1, data_dir, "week"),
+        solve_exact("small", 1, data_dir, "day", time_limit=60, mip_gap=0.05),
+    ):
+        assert len(result["hourly_cost_eur"]) == result["T"]
+        # every hour is rounded to cents, so allow a small deviation
+        assert abs(sum(result["hourly_cost_eur"]) - result["total_cost_eur"]) < 1.0
+
+
+def test_solver_time_limit_is_applied_and_reported(data_dir):
+    # Without a limit this problem needs about 15 s. HiGHS checks the limit only between its
+    # work steps (e.g. not in the middle of a cut round), so it may overrun it by several
+    # seconds, but it must stop early, return its best solution and say so.
+    result = solve_exact("medium", 1, data_dir, "week", time_limit=1)
+
+    assert result["stopped_at_time_limit"] is True
+    assert result["feasible"] is True
+    assert result["mip_gap"] > 0.01
+    assert result["model_build_seconds"] > 0   # copying the model into HiGHS is not solver time

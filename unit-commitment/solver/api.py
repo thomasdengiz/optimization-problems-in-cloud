@@ -130,9 +130,16 @@ def solve(req: SolveRequest):
         if needed > limit:
             raise HTTPException(
                 400,
-                f"Für diese Kombination braucht die exakte Methode etwa {needed:.0f} MB Arbeitsspeicher, "
-                f"der Server hat {limit:.0f} MB. Bitte ein kleineres Szenario, einen kürzeren Zeitraum "
-                "oder die Heuristik wählen.",
+                {
+                    "code": "memory_too_small",
+                    "message": (
+                        f"The exact method needs about {needed:.0f} MB of memory for this combination, "
+                        f"the server has {limit:.0f} MB. Choose a smaller scenario, a shorter period "
+                        "or the heuristic."
+                    ),
+                    "needed_mb": round(needed),
+                    "limit_mb": round(limit),
+                },
             )
 
     try:
@@ -147,7 +154,7 @@ def solve(req: SolveRequest):
     except Exception as error:
         # An HTTPException keeps the CORS headers, so the browser can show the message
         logger.exception("Could not start job")
-        raise HTTPException(503, f"Auftrag konnte nicht gestartet werden: {error}") from error
+        raise HTTPException(503, f"Could not start the job: {error}") from error
     return {"job_id": job_id, "status": "queued"}
 
 

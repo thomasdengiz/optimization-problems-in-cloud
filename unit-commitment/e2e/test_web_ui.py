@@ -31,22 +31,26 @@ def test_priority_list_small_day_shows_results_and_chart(app_page: Page):
     expect(app_page.get_by_test_id("r-feasible")).to_have_text("ja", timeout=60000)
     expect(app_page.get_by_test_id("r-cost")).to_contain_text("€")
     expect(app_page.get_by_test_id("r-vars")).to_contain_text("binär")
-    expect(app_page.get_by_test_id("chart")).to_be_visible()
-    assert app_page.locator("#day option").count() == 1
+    expect(app_page.get_by_test_id("day-section")).to_have_count(1)
+    expect(app_page.get_by_test_id("day-cost")).to_contain_text("€")
+    expect(app_page.locator("#days canvas")).to_be_visible()
 
 
-def test_week_horizon_offers_seven_days(app_page: Page):
+def test_week_horizon_shows_seven_days_below_each_other_with_costs(app_page: Page):
     select_germany(app_page)
     app_page.get_by_test_id("horizon").select_option("week")
 
     app_page.get_by_test_id("solve-button").click()
 
     expect(app_page.get_by_test_id("r-feasible")).to_be_visible(timeout=60000)
-    assert app_page.locator("#day option").count() == 7
+    expect(app_page.get_by_test_id("day-section")).to_have_count(7)
+    expect(app_page.get_by_test_id("day-cost")).to_have_count(7)
+    assert app_page.locator("#day").count() == 0   # no day dropdown any more
 
 
 def test_exact_method_shows_gap_and_solver_time(app_page: Page):
     select_germany(app_page)
+    expect(app_page.get_by_test_id("time-limit")).to_be_hidden()   # not used by the heuristic
     app_page.get_by_test_id("method").select_option("exact")
     expect(app_page.get_by_test_id("time-limit")).to_be_visible()
     app_page.get_by_test_id("time-limit").fill("60")
@@ -59,12 +63,72 @@ def test_exact_method_shows_gap_and_solver_time(app_page: Page):
     expect(app_page.get_by_test_id("r-gap")).not_to_have_text("")
 
 
-def test_unimplemented_method_shows_placeholder_and_disables_solve(app_page: Page):
+def test_unimplemented_methods_are_greyed_out_and_cannot_be_chosen(app_page: Page):
     select_germany(app_page)
-    app_page.get_by_test_id("method").select_option("ea")
 
-    expect(app_page.get_by_test_id("placeholder-note")).to_be_visible()
-    expect(app_page.get_by_test_id("solve-button")).to_be_disabled()
+    expect(app_page.locator("#method option[value=ea]")).to_be_disabled()
+    expect(app_page.locator("#method option[value=exact]")).to_be_enabled()
+    expect(app_page.locator("#method option[value=priority_list]")).to_be_enabled()
+    assert app_page.get_by_test_id("method").input_value() == "priority_list"
+
+
+def test_info_texts_change_with_the_selection(app_page: Page):
+    method_info = app_page.get_by_test_id("method-info")
+    scenario_info = app_page.get_by_test_id("scenario-info")
+    month_info = app_page.get_by_test_id("month-info")
+
+    app_page.get_by_test_id("method").select_option("exact")
+    exact_text = method_info.inner_text()
+    app_page.get_by_test_id("method").select_option("priority_list")
+    assert method_info.inner_text() != exact_text
+
+    app_page.get_by_test_id("scenario").select_option("small")
+    small_text = scenario_info.inner_text()
+    app_page.get_by_test_id("scenario").select_option("large")
+    assert scenario_info.inner_text() != small_text
+
+    app_page.get_by_test_id("month").select_option("3")
+    expect(month_info).to_contain_text("März")
+
+
+def test_language_can_be_switched_and_is_remembered(app_page: Page):
+    select_germany(app_page)
+    app_page.get_by_test_id("month").select_option("3")
+
+    app_page.get_by_test_id("language").select_option("en")
+
+    expect(app_page.get_by_test_id("solve-button")).to_have_text("Start optimization")
+    expect(app_page.get_by_test_id("country-info")).to_contain_text("Germany")
+    expect(app_page.get_by_test_id("month-info")).to_contain_text("March")
+    assert app_page.get_by_test_id("month").input_value() == "3"   # selection survives the switch
+
+    app_page.reload()
+    app_page.wait_for_function("document.querySelectorAll('#method option').length > 0", timeout=60000)
+    expect(app_page.get_by_test_id("solve-button")).to_have_text("Start optimization")
+
+
+def test_results_follow_the_language(app_page: Page):
+    select_germany(app_page)
+    app_page.get_by_test_id("solve-button").click()
+    expect(app_page.get_by_test_id("r-feasible")).to_have_text("ja", timeout=60000)
+
+    app_page.get_by_test_id("language").select_option("en")
+
+    expect(app_page.get_by_test_id("r-feasible")).to_have_text("yes")
+    expect(app_page.get_by_test_id("day-cost")).to_contain_text("Cost")
+
+
+def test_exact_run_stopped_at_the_time_limit_is_explained(app_page: Page):
+    select_germany(app_page)
+    app_page.get_by_test_id("method").select_option("exact")
+    app_page.get_by_test_id("scenario").select_option("medium")
+    app_page.get_by_test_id("horizon").select_option("week")
+    app_page.get_by_test_id("time-limit").fill("1")
+
+    app_page.get_by_test_id("solve-button").click()
+
+    expect(app_page.get_by_test_id("limit-note")).to_be_visible(timeout=120000)
+    expect(app_page.get_by_test_id("r-build-time")).to_contain_text("s")
 
 
 def test_lost_job_shows_clear_message(app_page: Page):

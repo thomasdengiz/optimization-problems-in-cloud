@@ -24,6 +24,19 @@ import pyomo.environ as pyo
 HORIZONS = ["day", "week", "month"]
 
 
+class NoSolutionFoundError(RuntimeError):
+    """The solver stopped (e.g. at the time limit) before it found any feasible solution."""
+
+
+def hourly_generation_cost(plants: list[dict], generation: list[list[float]]) -> list[float]:
+    """Generation cost (EUR) of every hour: marginal cost times output, summed over all plants."""
+    hours = len(generation[0]) if generation else 0
+    return [
+        round(sum(p["marginal_cost"] * g[t] for p, g in zip(plants, generation)), 2)
+        for t in range(hours)
+    ]
+
+
 def highs_available() -> bool:
     """Check whether the HiGHS solver backend (highspy) is installed."""
     return importlib.util.find_spec("highspy") is not None
@@ -118,6 +131,7 @@ def solve_exact(
             "Install 'highspy' or use the 'priority_list' method."
         )
 
+    function_start = time.perf_counter()
     data = load_data(scenario, month, data_dir, horizon)
     plants = data["plants"]
     hours = list(range(data["T"]))
@@ -378,23 +392,39 @@ def solve_exact(
     )
 
     solver = pyo.SolverFactory("appsi_highs")
-    solver.config.time_limit = time_limit
     if mip_gap is not None:
         solver.config.mip_gap = mip_gap
+
+    # Copy the Pyomo model into HiGHS first. This can take a long time for big models, so it is
+    # counted as model building and not as solver time. Otherwise the time limit would seem
+    # to be ignored: it only limits the time HiGHS itself runs.
+    solver.set_instance(model)
+    model_build_seconds = time.perf_counter() - function_start
+
+    # The time limit must be passed as `timelimit` here: Pyomo's solve() overwrites
+    # solver.config.time_limit with this argument (default: no limit).
     solve_start = time.perf_counter()
-    result = solver.solve(model, tee=False)
+    result = solver.solve(model, tee=False, timelimit=time_limit)
     solve_time_seconds = time.perf_counter() - solve_start
     objective_lower_bound = result.problem.lower_bound
     objective_upper_bound = result.problem.upper_bound
     mip_gap = relative_mip_gap(objective_upper_bound, objective_lower_bound)
 
+    # A solution counts if the solver found one, also when it stopped at the time limit
+    if model.var_power_generated[0, 0].value is None:
+        raise NoSolutionFoundError(
+            f"HiGHS found no solution (termination: {result.solver.termination_condition}). "
+            f"The time limit of {time_limit} s may be too short, or the model is infeasible."
+        )
     feasible = result.solver.termination_condition in [
         pyo.TerminationCondition.optimal,
         pyo.TerminationCondition.feasible,
+        pyo.TerminationCondition.maxTimeLimit,
     ]
 
     schedule = []
     total_cost = 0.0
+    generation_by_unit = []
 
     for unit_id in conventional_unit_ids:
         plant = conventional_plants[unit_id]
@@ -402,6 +432,7 @@ def solve_exact(
             round(pyo.value(model.var_power_generated[unit_id, hour]), 2)
             for hour in hours
         ]
+        generation_by_unit.append(generation)
         online = [
             int(round(pyo.value(model.var_unit_on[unit_id, hour])))
             for hour in hours
@@ -450,6 +481,9 @@ def solve_exact(
         "objective_upper_bound": objective_upper_bound,
         "mip_gap": mip_gap,
         "solve_time_seconds": solve_time_seconds,
+        "model_build_seconds": model_build_seconds,
+        "stopped_at_time_limit": result.solver.termination_condition == pyo.TerminationCondition.maxTimeLimit,
+        "hourly_cost_eur": hourly_generation_cost(conventional_plants, generation_by_unit),
         "num_variables": counts["total"],
         "num_binary_variables": counts["binary"],
         "num_continuous_variables": counts["continuous"],

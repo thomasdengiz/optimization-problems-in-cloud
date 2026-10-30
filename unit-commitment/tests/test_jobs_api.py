@@ -99,7 +99,7 @@ def test_exact_run_too_big_for_the_server_memory_is_rejected(monkeypatch):
     response = client.post("/solve", json={"method": "exact", "scenario": "large", "horizon": "month"})
 
     assert response.status_code == 400
-    assert "Arbeitsspeicher" in response.json()["detail"]
+    assert response.json()["detail"]["code"] == "memory_too_small"
 
 
 def test_heuristic_is_not_limited_by_the_memory_guard(monkeypatch):

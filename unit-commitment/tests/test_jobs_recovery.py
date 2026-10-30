@@ -9,12 +9,18 @@ import time
 
 import pytest
 
+from solver.exact import NoSolutionFoundError
 from solver.jobs import JobManager, memory_limit_mb
 
 
 def crash_worker(**_params):
     """Simulate the out-of-memory killer: the worker process disappears without a trace."""
     os._exit(1)
+
+
+def no_solution_job(**_params):
+    """Simulate a solver that hit the time limit before it found any solution."""
+    raise NoSolutionFoundError("no solution within the time limit")
 
 
 def quick_job(**_params):
@@ -46,7 +52,15 @@ def test_killed_worker_is_reported_with_a_helpful_message(manager):
     job = wait_for(manager, job_id)
 
     assert job["status"] == "failed"
-    assert "Arbeitsspeicher" in job["error"]
+    assert job["error_code"] == "worker_killed"
+    assert "memory" in job["error"]
+
+
+def test_missing_solution_gets_its_own_error_code(manager):
+    job = wait_for(manager, manager.submit(target=no_solution_job))
+
+    assert job["status"] == "failed"
+    assert job["error_code"] == "no_solution"
 
 
 def test_manager_keeps_working_after_a_worker_was_killed(manager):

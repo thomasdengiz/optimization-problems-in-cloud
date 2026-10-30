@@ -13,7 +13,7 @@ import uuid
 from concurrent.futures import Future, ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 
-from .exact import solve_exact
+from .exact import NoSolutionFoundError, solve_exact
 from .priority_list import solve_priority_list
 
 # Log lines end up in the container console (Azure log stream). Worker processes import this
@@ -31,11 +31,11 @@ if not logger.handlers:
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
 MAX_JOBS_KEPT = 200  # oldest finished jobs are dropped beyond this number
 
-# Shown to the user when the operating system killed a worker process
+# Shown when the operating system killed a worker process. Together with the error code
+# "worker_killed" the web page can show the message in the selected language.
 WORKER_KILLED_MESSAGE = (
-    "Der Rechenprozess wurde vom Betriebssystem beendet, vermutlich wegen zu wenig "
-    "Arbeitsspeicher auf dem Server. Bitte ein kleineres Szenario oder einen kürzeren "
-    "Zeitraum wählen."
+    "The calculation process was killed by the operating system, probably because the server "
+    "ran out of memory. Please choose a smaller scenario or a shorter period."
 )
 
 
@@ -148,9 +148,16 @@ class JobManager:
         error = future.exception()
         if isinstance(error, BrokenProcessPool):
             logger.error("Job %s failed: a worker process was killed (probably out of memory)", job_id)
-            return {"job_id": job_id, "status": "failed", "error": WORKER_KILLED_MESSAGE}
+            return {
+                "job_id": job_id, "status": "failed",
+                "error": WORKER_KILLED_MESSAGE, "error_code": "worker_killed",
+            }
         if error is not None:
-            return {"job_id": job_id, "status": "failed", "error": f"{type(error).__name__}: {error}"}
+            code = "no_solution" if isinstance(error, NoSolutionFoundError) else None
+            return {
+                "job_id": job_id, "status": "failed",
+                "error": f"{type(error).__name__}: {error}", "error_code": code,
+            }
         return {"job_id": job_id, "status": "done", "result": future.result()}
 
     def _drop_old_jobs(self) -> None:
