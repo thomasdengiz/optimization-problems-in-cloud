@@ -37,6 +37,40 @@ Chart.defaults.color = "#57606a";
 // Colour of the load line and its legend swatch
 const LOAD_COLOR = "#1f2328";
 
+/** Hex colour to rgba string with the given alpha (non-hex colours are returned unchanged). */
+function withAlpha(color, alpha) {
+  if (!/^#[0-9a-f]{6}$/i.test(color)) return color;
+  const n = parseInt(color.slice(1), 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+}
+
+/** Bar fill: vertical gradient, softer at the bottom and full colour at the top. */
+function barFill(color) {
+  return ({ chart }) => {
+    const { ctx, chartArea } = chart;
+    if (!chartArea) return color;
+    const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+    gradient.addColorStop(0, withAlpha(color, 0.7));
+    gradient.addColorStop(1, color);
+    return gradient;
+  };
+}
+
+/** Light column behind the hovered hour, so the active time slot is easy to see. */
+const hoverColumn = {
+  id: "hoverColumn",
+  beforeDatasetsDraw(chart) {
+    const active = chart.getActiveElements();
+    if (!active.length) return;
+    const { ctx, chartArea } = chart;
+    const slot = (chartArea.right - chartArea.left) / chart.data.labels.length;
+    ctx.save();
+    ctx.fillStyle = "rgba(31, 35, 40, 0.06)";
+    ctx.fillRect(active[0].element.x - slot / 2, chartArea.top, slot, chartArea.bottom - chartArea.top);
+    ctx.restore();
+  },
+};
+
 const $ = (id) => document.getElementById(id);
 const state = {
   language: detectLanguage(localStorage.getItem(LANGUAGE_STORAGE_KEY), navigator.language),
@@ -454,24 +488,34 @@ function drawChart(canvas, profile, locale) {
     order: 1,                       // higher order = drawn behind the load line
     label: t(`series.${stack.key}`),
     seriesKey: stack.key,
+    seriesColor: stack.color,       // plain colour, used by the legend-like tooltip swatch
     data: stack.values,
-    backgroundColor: stack.color,
+    backgroundColor: barFill(stack.color),
     stack: "supply",
-    barPercentage: 1,
-    categoryPercentage: 1,
+    barPercentage: 0.8,
+    categoryPercentage: 0.9,
     borderWidth: 0,
+    borderRadius: 3,
+    borderSkipped: false,
   }));
   datasets.push({
     type: "line",
     order: 0,                       // lower order = drawn on top of the bars
     label: t("series.load"),
     seriesKey: "load",
+    seriesColor: LOAD_COLOR,
     data: profile.load,
     borderColor: LOAD_COLOR,
     backgroundColor: LOAD_COLOR,
     borderWidth: 2.5,
+    borderCapStyle: "round",
+    borderJoinStyle: "round",
+    tension: 0.3,
     pointRadius: 0,
-    pointHoverRadius: 4,
+    pointHoverRadius: 5,
+    pointHoverBackgroundColor: "#fff",
+    pointHoverBorderColor: LOAD_COLOR,
+    pointHoverBorderWidth: 2,
   });
 
   // The tooltip is a separate HTML card (it can show icons), placed inside the chart box.
@@ -482,9 +526,11 @@ function drawChart(canvas, profile, locale) {
 
   return new Chart(canvas, {
     data: { labels: profile.labels, datasets },
+    plugins: [hoverColumn],
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      animation: { duration: 800, easing: "easeOutQuart" },
       interaction: { mode: "index", intersect: false },   // hovering an hour shows all its series
       plugins: {
         legend: { display: false },   // the HTML legend from buildLegend() is used instead
@@ -498,12 +544,13 @@ function drawChart(canvas, profile, locale) {
           stacked: true,
           border: { display: false },
           grid: { display: false },
-          ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 12 },
+          // every hour is shown; labels rotate only if the chart is too narrow for them
+          ticks: { autoSkip: false, minRotation: 0, maxRotation: 45, font: { size: 11 } },
         },
         y: {
           stacked: true,
           border: { display: false },
-          grid: { color: "#eaeef2" },
+          grid: { color: "#eef1f4", borderDash: [4, 4] },
           ticks: { callback: (value) => formatNumber(value, 0, locale) },
           title: { display: true, text: t("profile.unit") },
         },
@@ -540,7 +587,7 @@ function renderTooltip(element, context, locale) {
 
     const swatch = document.createElement("span");
     swatch.className = "swatch";
-    swatch.style.backgroundColor = dataset.backgroundColor;
+    swatch.style.backgroundColor = dataset.seriesColor;
     row.appendChild(swatch);
 
     if (SERIES_ICONS[dataset.seriesKey]) {
