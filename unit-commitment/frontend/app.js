@@ -3,7 +3,7 @@
  * Pure helper functions live in lib.js, all texts in i18n.js.
  */
 import {
-  buildDayProfiles, buildSolveRequest, formatGap, formatNumber,
+  buildDayMix, buildDayProfiles, buildSolveRequest, formatGap, formatNumber,
 } from "./lib.js";
 import {
   detectLanguage, infoText, LOCALES, MONTH_NAMES, translate,
@@ -77,6 +77,7 @@ const state = {
   country: null,
   methods: {},
   result: null,
+  view: "load", // "load" (load profile, default) or "mix" (generation mix donut)
   charts: [],
   status: null,   // { key, params } of the status line, or { text } for untranslated text
   running: false,
@@ -439,6 +440,17 @@ function renderDays(locale) {
     }
     section.appendChild(heading);
 
+    if (state.view === "mix") {
+      const box = document.createElement("div");
+      box.className = "chart-box donut-box";
+      const canvas = document.createElement("canvas");
+      box.appendChild(canvas);
+      section.appendChild(box);
+      container.appendChild(section);
+      state.charts.push(drawDonut(canvas, profile, locale));
+      return;
+    }
+
     const box = document.createElement("div");
     box.className = "chart-box";
     const canvas = document.createElement("canvas");
@@ -618,6 +630,196 @@ function renderTooltip(element, context, locale) {
   element.style.left = `${Math.max(left, 0)}px`;
   element.style.top = `${Math.max(top, 0)}px`;
 }
+
+/** Dark text on light colours, white text on dark colours. */
+function textColorFor(hex) {
+  if (!/^#[0-9a-f]{6}$/i.test(hex)) return "#fff";
+  const value = parseInt(hex.slice(1), 16);
+  const luminance = (0.299 * ((value >> 16) & 255) + 0.587 * ((value >> 8) & 255) + 0.114 * (value & 255)) / 255;
+  return luminance > 0.6 ? "#1f2328" : "#fff";
+}
+
+/** Icon images for the donut labels, loaded once. The charts are redrawn when an icon has arrived. */
+const iconImages = {};
+function iconImage(key) {
+  if (!SERIES_ICONS[key]) return null;
+  if (!iconImages[key]) {
+    const image = new Image();
+    image.onload = () => state.charts.forEach((chart) => chart.draw());
+    image.src = SERIES_ICONS[key];
+    iconImages[key] = image;
+  }
+  return iconImages[key];
+}
+
+const DONUT_ICON_SIZE = 16;
+const DONUT_LABEL_SPACING = 40; // minimum vertical distance between two outside labels on the same side
+
+/**
+ * Donut plugin: percentages inside the ring (large slices only), labels with leader lines outside
+ * (icon, name, summed energy) and total demand in the centre.
+ */
+const donutLabels = {
+  id: "donutLabels",
+  afterDatasetsDraw(chart) {
+    const options = chart.options.plugins.donutLabels;
+    const arcs = chart.getDatasetMeta(0).data;
+    if (!options || arcs.length === 0) return;
+    const { ctx } = chart;
+    const { x: cx, y: cy, outerRadius } = arcs[0];
+
+    ctx.save();
+    ctx.textBaseline = "middle";
+
+    // percentages inside the ring
+    ctx.textAlign = "center";
+    ctx.font = "600 13px system-ui, sans-serif";
+    arcs.forEach((arc, i) => {
+      const item = options.items[i];
+      if (item.share < 5) return;
+      const angle = (arc.startAngle + arc.endAngle) / 2;
+      const radius = (arc.innerRadius + arc.outerRadius) / 2;
+      ctx.fillStyle = textColorFor(item.color);
+      ctx.fillText(item.percentText, cx + radius * Math.cos(angle), cy + radius * Math.sin(angle));
+    });
+
+    // labels outside with leader lines
+    const reach = outerRadius + 56;
+    const labels = arcs.map((arc, i) => {
+      const angle = (arc.startAngle + arc.endAngle) / 2;
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      return {
+        item: options.items[i],
+        dir: cos >= 0 ? 1 : -1,
+        anchor: { x: cx + (outerRadius + 3) * cos, y: cy + (outerRadius + 3) * sin },
+        elbow: { x: cx + (outerRadius + 18) * cos, y: cy + (outerRadius + 18) * sin },
+        y: cy + (outerRadius + 18) * sin,
+      };
+    });
+    for (const dir of [1, -1]) {
+      const side = labels.filter((label) => label.dir === dir).sort((a, b) => a.y - b.y);
+      side.forEach((label, i) => {
+        if (i > 0) label.y = Math.max(label.y, side[i - 1].y + DONUT_LABEL_SPACING);
+      });
+    }
+
+    ctx.textAlign = "left";
+    for (const { item, dir, anchor, elbow, y } of labels) {
+      const labelX = cx + dir * reach;
+
+      ctx.strokeStyle = "#8c959f";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(anchor.x, anchor.y);
+      ctx.lineTo(elbow.x, elbow.y);
+      ctx.lineTo(labelX - dir * 4, y);
+      ctx.stroke();
+
+      const name = item.share < 5 ? `${item.name} (${item.percentText})` : item.name;
+      ctx.font = "600 13px system-ui, sans-serif";
+      const nameWidth = ctx.measureText(name).width;
+      ctx.font = "12px system-ui, sans-serif";
+      const sumWidth = ctx.measureText(item.sumText).width;
+      const blockWidth = DONUT_ICON_SIZE + 6 + Math.max(nameWidth, sumWidth);
+      const left = dir > 0 ? labelX : labelX - blockWidth;
+      const textX = left + DONUT_ICON_SIZE + 6;
+
+      const icon = iconImage(item.key);
+      if (icon && icon.complete) {
+        ctx.drawImage(icon, left, y - DONUT_ICON_SIZE / 2, DONUT_ICON_SIZE, DONUT_ICON_SIZE);
+      }
+      ctx.fillStyle = "#1f2328";
+      ctx.font = "600 13px system-ui, sans-serif";
+      ctx.fillText(name, textX, y - 8);
+      ctx.fillStyle = "#8c959f";
+      ctx.font = "12px system-ui, sans-serif";
+      ctx.fillText(item.sumText, textX, y + 9);
+    }
+
+    // total demand in the centre
+    const center = options.center;
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#57606a";
+    ctx.font = "12px system-ui, sans-serif";
+    ctx.fillText(center.caption, cx, cy - 16);
+    ctx.fillStyle = "#1f2328";
+    ctx.font = "700 22px system-ui, sans-serif";
+    ctx.fillText(center.value, cx, cy + 6);
+    ctx.fillStyle = "#57606a";
+    ctx.font = "12px system-ui, sans-serif";
+    ctx.fillText(center.unit, cx, cy + 26);
+
+    ctx.restore();
+  },
+};
+
+/** Donut chart with the generation mix of one day (shares of the total generation). */
+function drawDonut(canvas, profile, locale) {
+  const mix = buildDayMix(profile);
+  const narrow = canvas.parentElement.clientWidth < 520;
+  const sideSpace = narrow ? 16 : 170; // room for the outside labels
+  return new Chart(canvas, {
+    type: "doughnut",
+    data: {
+      labels: mix.sources.map((source) => t(`series.${source.key}`)),
+      datasets: [
+        {
+          data: mix.sources.map((source) => source.energyMWh),
+          backgroundColor: mix.sources.map((source) => source.color),
+          borderColor: "#fff",
+          borderWidth: 2,
+          hoverOffset: 6,
+        },
+      ],
+    },
+    plugins: [donutLabels],
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: "62%",
+      animation: { duration: 800, easing: "easeOutQuart" },
+      layout: { padding: { left: sideSpace, right: sideSpace, top: 8, bottom: 8 } },
+      plugins: {
+        legend: { display: false },
+        tooltip: { enabled: false },
+        donutLabels: {
+          center: {
+            caption: t("mix.demand"),
+            value: formatNumber(mix.demandMWh, 0, locale),
+            unit: t("mix.unit"),
+          },
+          items: mix.sources.map((source) => ({
+            key: source.key,
+            name: t(`series.${source.key}`),
+            color: source.color,
+            share: source.share,
+            percentText: `${formatNumber(source.share, 1, locale)} %`,
+            sumText: `${formatNumber(source.energyMWh, 0, locale)} ${t("mix.unit")}`,
+          })),
+        },
+      },
+    },
+  });
+}
+
+/** Switch between the load profile view and the generation mix view. */
+function setView(view) {
+  state.view = view;
+  updateViewButtons();
+  if (state.result) renderDays(LOCALES[state.language]);
+}
+
+function updateViewButtons() {
+  document.querySelectorAll("[data-view]").forEach((button) => {
+    button.setAttribute("aria-pressed", String(button.dataset.view === state.view));
+  });
+}
+
+document.querySelectorAll("[data-view]").forEach((button) => {
+  button.addEventListener("click", () => setView(button.dataset.view));
+});
+updateViewButtons();
 
 const languageTrigger = $("language");
 const languageOptions = $("language-options");

@@ -60,3 +60,10 @@ option:disabled { color: #9aa5b1; }
 .chart-tooltip-row .name { flex: 1; }
 .chart-tooltip-row .value { white-space: nowrap; font-weight: 600; font-variant-numeric: tabular-nums; }
 .chart-tooltip-row.is-load { margin-top: .3rem; padding-top: .35rem; border-top: 1px solid var(--border); }
+.view-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: .5rem; margin-top: 1.2rem; }
+.view-head h3 { margin: 0; }
+.view-toggle { display: inline-flex; padding: 3px; border: 1px solid var(--border); border-radius: 999px; background: #fff; }
+.view-toggle button { width: auto; margin: 0; padding: .35rem 1rem; border-radius: 999px; background: transparent; color: #57606a; font-size: .9rem; }
+.view-toggle button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+.view-toggle button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.donut-box { height: 330px; }

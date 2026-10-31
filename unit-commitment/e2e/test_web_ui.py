@@ -36,6 +36,19 @@ def test_priority_list_small_day_shows_results_and_chart(app_page: Page):
     expect(app_page.locator("#days canvas")).to_be_visible()
 
 
+def test_view_switch_shows_generation_mix_donut(app_page: Page):
+    select_germany(app_page)
+    app_page.get_by_test_id("horizon").select_option("day")
+    app_page.get_by_test_id("solve-button").click()
+    expect(app_page.get_by_test_id("r-feasible")).to_have_text("ja", timeout=60000)
+
+    expect(app_page.locator('[data-view="load"]')).to_have_attribute("aria-pressed", "true")
+    app_page.locator('[data-view="mix"]').click()
+
+    expect(app_page.locator('[data-view="mix"]')).to_have_attribute("aria-pressed", "true")
+    expect(app_page.locator("#days .donut-box canvas")).to_be_visible()
+
+
 def test_week_horizon_shows_seven_days_below_each_other_with_costs(app_page: Page):
     select_germany(app_page)
     app_page.get_by_test_id("horizon").select_option("week")

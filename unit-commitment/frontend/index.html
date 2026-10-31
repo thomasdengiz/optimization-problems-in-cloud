@@ -101,7 +101,13 @@
         <p id="limit-note" data-testid="limit-note" class="note" data-i18n="result.limitReached" hidden></p>
         <ul id="reasons" data-testid="reasons"></ul>
 
-        <h3 data-i18n="profile.heading"></h3>
+        <div class="view-head">
+          <h3 data-i18n="profile.heading"></h3>
+          <div class="view-toggle">
+            <button type="button" data-view="load" data-testid="view-load" aria-pressed="true" data-i18n="view.load"></button>
+            <button type="button" data-view="mix" data-testid="view-mix" aria-pressed="false" data-i18n="view.mix"></button>
+          </div>
+        </div>
         <div id="days" data-testid="days"></div>
       </div>
     </section>

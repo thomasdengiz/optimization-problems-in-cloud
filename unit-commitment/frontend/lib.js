@@ -105,3 +105,32 @@ export function buildDayProfiles(result) {
   }
   return profiles;
 }
+
+/**
+ * Generation mix of one day profile.
+ *  - demandMWh:          sum of the load over the day (hourly MW values, so MWh)
+ *  - totalGenerationMWh: sum of all generation of the day (pump charging is consumption and not counted)
+ *  - sources:            list of { key, color, energyMWh, share } with share in % of the total generation,
+ *                        sorted by energy; sources without generation are left out
+ */
+export function buildDayMix(profile) {
+  const sources = profile.stacks
+    .filter((stack) => stack.key !== "pump_charging")
+    .map((stack) => ({
+      key: stack.key,
+      color: stack.color,
+      energyMWh: stack.values.reduce((sum, value) => sum + Math.max(value, 0), 0),
+    }))
+    .filter((source) => source.energyMWh > 0)
+    .sort((a, b) => b.energyMWh - a.energyMWh);
+
+  const totalGenerationMWh = sources.reduce((sum, source) => sum + source.energyMWh, 0);
+  for (const source of sources) {
+    source.share = (source.energyMWh / totalGenerationMWh) * 100;
+  }
+  return {
+    demandMWh: profile.load.reduce((sum, value) => sum + value, 0),
+    totalGenerationMWh,
+    sources,
+  };
+}
