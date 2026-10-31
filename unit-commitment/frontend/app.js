@@ -659,6 +659,31 @@ const DONUT_LABEL_BLOCK = 230; // estimated width of one label (icon, name, sum)
 const DONUT_VERTICAL_MARGIN = 30; // free space above and below the ring
 
 /**
+ * Chooses the side of each label (1 = right, -1 = left). The right side gets one contiguous block of
+ * slices, the left side the rest. The block is picked so that its slices lie as far right as possible,
+ * and both sides get about the same number of labels.
+ */
+function assignSides(arcs) {
+  const n = arcs.length;
+  const mids = arcs.map((arc) => (arc.startAngle + arc.endAngle) / 2);
+  let best = { score: -Infinity, sides: arcs.map(() => -1) };
+  for (const count of new Set([Math.floor(n / 2), Math.ceil(n / 2)])) {
+    for (let start = 0; start < n; start++) {
+      const sides = new Array(n).fill(-1);
+      let score = 0;
+      for (let j = 0; j < n; j++) {
+        const index = (start + j) % n;
+        const right = j < count;
+        sides[index] = right ? 1 : -1;
+        score += right ? Math.cos(mids[index]) : -Math.cos(mids[index]);
+      }
+      if (score > best.score) best = { score, sides };
+    }
+  }
+  return best.sides;
+}
+
+/**
  * Donut plugin: percentages inside the ring (large slices only), labels with leader lines outside
  * (icon, name, summed energy) and total demand in the centre.
  */
@@ -690,13 +715,14 @@ const donutLabels = {
     const reach = outerRadius + DONUT_LABEL_REACH;
     const minY = 24;
     const maxY = chart.height - 24;
+    const sides = assignSides(arcs);
     const labels = arcs.map((arc, i) => {
       const angle = (arc.startAngle + arc.endAngle) / 2;
       const cos = Math.cos(angle);
       const sin = Math.sin(angle);
       return {
         item: options.items[i],
-        dir: cos >= 0 ? 1 : -1,
+        dir: sides[i],
         anchor: { x: cx + (outerRadius + 3) * cos, y: cy + (outerRadius + 3) * sin },
         elbow: { x: cx + (outerRadius + 18) * cos, y: cy + (outerRadius + 18) * sin },
         y: cy + (outerRadius + 18) * sin,
