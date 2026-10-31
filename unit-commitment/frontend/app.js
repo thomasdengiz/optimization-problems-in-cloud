@@ -652,8 +652,11 @@ function iconImage(key) {
   return iconImages[key];
 }
 
-const DONUT_ICON_SIZE = 16;
-const DONUT_LABEL_SPACING = 40; // minimum vertical distance between two outside labels on the same side
+const DONUT_ICON_SIZE = 20;
+const DONUT_LABEL_SPACING = 48; // minimum vertical distance between two outside labels on the same side
+const DONUT_LABEL_REACH = 40; // distance from the ring edge to the label column
+const DONUT_LABEL_BLOCK = 230; // estimated width of one label (icon, name, sum)
+const DONUT_VERTICAL_MARGIN = 30; // free space above and below the ring
 
 /**
  * Donut plugin: percentages inside the ring (large slices only), labels with leader lines outside
@@ -673,7 +676,7 @@ const donutLabels = {
 
     // percentages inside the ring
     ctx.textAlign = "center";
-    ctx.font = "600 13px system-ui, sans-serif";
+    ctx.font = "600 15px system-ui, sans-serif";
     arcs.forEach((arc, i) => {
       const item = options.items[i];
       if (item.share < 5) return;
@@ -684,7 +687,9 @@ const donutLabels = {
     });
 
     // labels outside with leader lines
-    const reach = outerRadius + 56;
+    const reach = outerRadius + DONUT_LABEL_REACH;
+    const minY = 24;
+    const maxY = chart.height - 24;
     const labels = arcs.map((arc, i) => {
       const angle = (arc.startAngle + arc.endAngle) / 2;
       const cos = Math.cos(angle);
@@ -697,11 +702,16 @@ const donutLabels = {
         y: cy + (outerRadius + 18) * sin,
       };
     });
+    // keep labels on each side apart and inside the canvas
     for (const dir of [1, -1]) {
       const side = labels.filter((label) => label.dir === dir).sort((a, b) => a.y - b.y);
       side.forEach((label, i) => {
+        label.y = Math.min(Math.max(label.y, minY), maxY);
         if (i > 0) label.y = Math.max(label.y, side[i - 1].y + DONUT_LABEL_SPACING);
       });
+      for (let i = side.length - 2; i >= 0; i--) {
+        side[i].y = Math.min(side[i].y, side[i + 1].y - DONUT_LABEL_SPACING);
+      }
     }
 
     ctx.textAlign = "left";
@@ -717,38 +727,38 @@ const donutLabels = {
       ctx.stroke();
 
       const name = item.share < 5 ? `${item.name} (${item.percentText})` : item.name;
-      ctx.font = "600 13px system-ui, sans-serif";
+      ctx.font = "600 15px system-ui, sans-serif";
       const nameWidth = ctx.measureText(name).width;
-      ctx.font = "12px system-ui, sans-serif";
+      ctx.font = "13px system-ui, sans-serif";
       const sumWidth = ctx.measureText(item.sumText).width;
-      const blockWidth = DONUT_ICON_SIZE + 6 + Math.max(nameWidth, sumWidth);
+      const blockWidth = DONUT_ICON_SIZE + 8 + Math.max(nameWidth, sumWidth);
       const left = dir > 0 ? labelX : labelX - blockWidth;
-      const textX = left + DONUT_ICON_SIZE + 6;
+      const textX = left + DONUT_ICON_SIZE + 8;
 
       const icon = iconImage(item.key);
       if (icon && icon.complete) {
         ctx.drawImage(icon, left, y - DONUT_ICON_SIZE / 2, DONUT_ICON_SIZE, DONUT_ICON_SIZE);
       }
       ctx.fillStyle = "#1f2328";
-      ctx.font = "600 13px system-ui, sans-serif";
-      ctx.fillText(name, textX, y - 8);
-      ctx.fillStyle = "#8c959f";
-      ctx.font = "12px system-ui, sans-serif";
-      ctx.fillText(item.sumText, textX, y + 9);
+      ctx.font = "600 15px system-ui, sans-serif";
+      ctx.fillText(name, textX, y - 10);
+      ctx.fillStyle = "#6e7781";
+      ctx.font = "13px system-ui, sans-serif";
+      ctx.fillText(item.sumText, textX, y + 10);
     }
 
     // total demand in the centre
     const center = options.center;
     ctx.textAlign = "center";
     ctx.fillStyle = "#57606a";
-    ctx.font = "12px system-ui, sans-serif";
-    ctx.fillText(center.caption, cx, cy - 16);
+    ctx.font = "13px system-ui, sans-serif";
+    ctx.fillText(center.caption, cx, cy - 20);
     ctx.fillStyle = "#1f2328";
-    ctx.font = "700 22px system-ui, sans-serif";
+    ctx.font = "700 26px system-ui, sans-serif";
     ctx.fillText(center.value, cx, cy + 6);
     ctx.fillStyle = "#57606a";
-    ctx.font = "12px system-ui, sans-serif";
-    ctx.fillText(center.unit, cx, cy + 26);
+    ctx.font = "14px system-ui, sans-serif";
+    ctx.fillText(center.unit, cx, cy + 30);
 
     ctx.restore();
   },
@@ -757,8 +767,15 @@ const donutLabels = {
 /** Donut chart with the generation mix of one day (shares of the total generation). */
 function drawDonut(canvas, profile, locale) {
   const mix = buildDayMix(profile);
-  const narrow = canvas.parentElement.clientWidth < 520;
-  const sideSpace = narrow ? 16 : 170; // room for the outside labels
+  // Size the ring so that the labels on both sides fit inside the box and the ring is centred.
+  const boxWidth = canvas.parentElement.clientWidth;
+  const boxHeight = canvas.parentElement.clientHeight;
+  const radius = Math.max(
+    60,
+    Math.min((boxHeight - 2 * DONUT_VERTICAL_MARGIN) / 2, boxWidth / 2 - DONUT_LABEL_REACH - DONUT_LABEL_BLOCK),
+  );
+  const sideSpace = Math.max(0, (boxWidth - 2 * radius) / 2);
+  const verticalSpace = Math.max(8, (boxHeight - 2 * radius) / 2);
   return new Chart(canvas, {
     type: "doughnut",
     data: {
@@ -779,7 +796,7 @@ function drawDonut(canvas, profile, locale) {
       maintainAspectRatio: false,
       cutout: "62%",
       animation: { duration: 800, easing: "easeOutQuart" },
-      layout: { padding: { left: sideSpace, right: sideSpace, top: 8, bottom: 8 } },
+      layout: { padding: { left: sideSpace, right: sideSpace, top: verticalSpace, bottom: verticalSpace } },
       plugins: {
         legend: { display: false },
         tooltip: { enabled: false },

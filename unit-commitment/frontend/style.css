@@ -66,4 +66,4 @@ option:disabled { color: #9aa5b1; }
 .view-toggle button { width: auto; margin: 0; padding: .35rem 1rem; border-radius: 999px; background: transparent; color: #57606a; font-size: .9rem; }
 .view-toggle button[aria-pressed="true"] { background: var(--accent); color: #fff; }
 .view-toggle button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.donut-box { height: 330px; }
+.donut-box { height: 400px; }
