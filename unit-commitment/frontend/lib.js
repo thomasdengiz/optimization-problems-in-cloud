@@ -50,6 +50,14 @@ export function dayDate(resultDate, dayIndex) {
   return start.toISOString().slice(0, 10);
 }
 
+/** Format a "YYYY-MM-DD" date for the locale, e.g. "08.09.2023" for "de-DE". */
+export function formatDate(isoDate, locale = "de-DE") {
+  const [year, month, day] = isoDate.slice(0, 10).split("-").map(Number);
+  return new Intl.DateTimeFormat(locale, {
+    day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC",
+  }).format(new Date(Date.UTC(year, month - 1, day)));
+}
+
 /**
  * Split a result into one profile per day (24 hours each; the last day may be shorter).
  *

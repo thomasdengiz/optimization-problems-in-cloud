@@ -3,7 +3,7 @@
  * Pure helper functions live in lib.js, all texts in i18n.js.
  */
 import {
-  buildDayMix, buildDayProfiles, buildSolveRequest, formatGap, formatNumber,
+  buildDayMix, buildDayProfiles, buildSolveRequest, formatDate, formatGap, formatNumber,
 } from "./lib.js";
 import {
   detectLanguage, infoText, LOCALES, MONTH_NAMES, translate,
@@ -158,7 +158,7 @@ function renderMonthOptions() {
 /** Method names in the selected language; unavailable methods are greyed out and cannot be chosen. */
 function renderMethodOptions() {
   const select = $("method");
-  const selected = select.value || "priority_list";
+  const selected = select.value || "exact";
   select.replaceChildren();
   for (const [key, info] of Object.entries(state.methods)) {
     const label = t(`method.${key}`) === `method.${key}` ? info.label : t(`method.${key}`);
@@ -248,7 +248,7 @@ async function connectToServer() {
 
   state.methods = await (await fetch(`${API}/methods`)).json();
   renderMethodOptions();
-  $("method").value = "priority_list";
+  $("method").value = "exact";
   renderInfoTexts();
   updateSolveButton();
 }
@@ -388,7 +388,7 @@ function renderResult() {
   $("result").hidden = false;
 
   const solverSeconds = result.solve_time_seconds ?? result.solve_time_ms / 1000;
-  const seconds = (value) => (value === null || value === undefined ? "–" : `${formatNumber(value, 2, locale)} s`);
+  const seconds = (value) => (value === null || value === undefined ? "–" : `${formatNumber(value, 0, locale)} s`);
   $("r-cost").textContent = `${formatNumber(result.total_cost_eur, 0, locale)} €`;
   $("r-solver-time").textContent = seconds(solverSeconds);
   $("r-build-time").textContent = seconds(result.model_build_seconds);
@@ -429,7 +429,8 @@ function renderDays(locale) {
 
     const heading = document.createElement("h4");
     const title = document.createElement("span");
-    title.textContent = t("profile.day", { n: index + 1, date: profile.date });
+    const date = state.language === "de" ? formatDate(profile.date, locale) : profile.date;
+    title.textContent = t("profile.day", { n: index + 1, date });
     heading.appendChild(title);
     if (profile.costEur !== null) {
       const cost = document.createElement("span");

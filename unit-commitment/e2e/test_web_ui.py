@@ -63,6 +63,7 @@ def test_week_horizon_shows_seven_days_below_each_other_with_costs(app_page: Pag
 
 def test_exact_method_shows_gap_and_solver_time(app_page: Page):
     select_germany(app_page)
+    app_page.get_by_test_id("method").select_option("priority_list")
     expect(app_page.get_by_test_id("time-limit")).to_be_hidden()   # not used by the heuristic
     app_page.get_by_test_id("method").select_option("exact")
     expect(app_page.get_by_test_id("time-limit")).to_be_visible()
@@ -82,7 +83,7 @@ def test_unimplemented_methods_are_greyed_out_and_cannot_be_chosen(app_page: Pag
     expect(app_page.locator("#method option[value=ea]")).to_be_disabled()
     expect(app_page.locator("#method option[value=exact]")).to_be_enabled()
     expect(app_page.locator("#method option[value=priority_list]")).to_be_enabled()
-    assert app_page.get_by_test_id("method").input_value() == "priority_list"
+    assert app_page.get_by_test_id("method").input_value() == "exact"
 
 
 def test_info_texts_change_with_the_selection(app_page: Page):

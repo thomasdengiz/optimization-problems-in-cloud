@@ -13,7 +13,7 @@ export const TRANSLATIONS = {
     "page.title": "Unit Commitment Optimizer",
     "page.subtitle": "Kraftwerkseinsatzplanung: Methode, Land, Szenario und Zeitraum wählen und die Optimierung in der Cloud starten.",
     "language.label": "Sprache",
-    "banner.starting": "Server wird gestartet … das kann bei kostenlosem Hosting bis zu einer Minute dauern.",
+    "banner.starting": "Server wird gestartet … das kann etwa eine Minute dauern.",
 
     "inputs.heading": "Eingaben",
     "country.label": "Land (Karte)",
@@ -111,7 +111,7 @@ export const TRANSLATIONS = {
     "page.title": "Unit Commitment Optimizer",
     "page.subtitle": "Power plant scheduling: choose method, country, scenario and period, then run the optimization in the cloud.",
     "language.label": "Language",
-    "banner.starting": "Server is starting … with free hosting this can take up to a minute.",
+    "banner.starting": "Server is starting … this can take about a minute.",
 
     "inputs.heading": "Inputs",
     "country.label": "Country (map)",
