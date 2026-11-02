@@ -388,7 +388,7 @@ function renderResult() {
   $("result").hidden = false;
 
   const solverSeconds = result.solve_time_seconds ?? result.solve_time_ms / 1000;
-  const seconds = (value) => (value === null || value === undefined ? "–" : `${formatNumber(value, 0, locale)} s`);
+  const seconds = (value) => (value === null || value === undefined ? "–" : `${formatNumber(value, 1, locale)} s`);
   $("r-cost").textContent = `${formatNumber(result.total_cost_eur, 0, locale)} €`;
   $("r-solver-time").textContent = seconds(solverSeconds);
   $("r-build-time").textContent = seconds(result.model_build_seconds);
