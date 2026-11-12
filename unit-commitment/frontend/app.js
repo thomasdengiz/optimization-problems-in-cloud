@@ -671,7 +671,7 @@ function iconImage(key) {
 }
 
 const DONUT_ICON_SIZE = 20;
-const DONUT_LABEL_SPACING = 48; // minimum vertical distance between two outside labels on the same side
+const DONUT_LABEL_SPACING = 52; // minimum vertical distance between two outside labels on the same side
 const DONUT_LABEL_REACH = 40; // distance from the ring edge to the label column
 const DONUT_LABEL_BLOCK = 230; // estimated width of one label (icon, name, sum)
 const DONUT_VERTICAL_MARGIN = 30; // free space above and below the ring
@@ -774,8 +774,9 @@ const donutLabels = {
       ctx.font = "600 15px system-ui, sans-serif";
       const nameWidth = ctx.measureText(name).width;
       ctx.font = "13px system-ui, sans-serif";
-      const sumWidth = ctx.measureText(item.sumText).width;
-      const blockWidth = DONUT_ICON_SIZE + 8 + Math.max(nameWidth, sumWidth);
+      const energyWidth = ctx.measureText(item.energyText).width;
+      const costWidth = ctx.measureText(item.costText).width;
+      const blockWidth = DONUT_ICON_SIZE + 8 + Math.max(nameWidth, energyWidth, costWidth);
       const left = dir > 0 ? labelX : labelX - blockWidth;
       const textX = left + DONUT_ICON_SIZE + 8;
 
@@ -785,10 +786,11 @@ const donutLabels = {
       }
       ctx.fillStyle = "#1f2328";
       ctx.font = "600 15px system-ui, sans-serif";
-      ctx.fillText(name, textX, y - 10);
+      ctx.fillText(name, textX, y - 16);
       ctx.fillStyle = "#6e7781";
       ctx.font = "13px system-ui, sans-serif";
-      ctx.fillText(item.sumText, textX, y + 10);
+      ctx.fillText(item.energyText, textX, y);
+      ctx.fillText(item.costText, textX, y + 16);
     }
 
     // total demand in the centre
@@ -856,7 +858,8 @@ function drawDonut(canvas, profile, locale) {
             color: source.color,
             share: source.share,
             percentText: `${formatNumber(source.share, 1, locale)} %`,
-            sumText: `${formatNumber(source.energyMWh, 0, locale)} ${t("mix.unit")} · ${formatNumber(source.costEur, 0, locale)} €`,
+            energyText: `${formatNumber(source.energyMWh, 0, locale)} ${t("mix.unit")}`,
+            costText: `${formatNumber(source.costEur, 0, locale)} €`,
           })),
         },
       },
