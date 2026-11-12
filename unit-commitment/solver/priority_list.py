@@ -313,6 +313,7 @@ def solve_priority_list(
         schedule.append({
             "plant_id":   p["id"],
             "type":       p["type"],
+            "marginal_cost": p["marginal_cost"],
             "color":      p["color"],
             "generation": generation[i],
             "online":     online[i],

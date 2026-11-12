@@ -29,6 +29,9 @@ def test_priority_list_small_day_shows_results_and_chart(app_page: Page):
     app_page.get_by_test_id("solve-button").click()
 
     expect(app_page.get_by_test_id("r-feasible")).to_have_text("ja", timeout=60000)
+    expect(app_page.get_by_test_id("run-info")).to_have_text(
+        "Land: Deutschland, Szenario: klein, Zeitraum: 1 Tag, Monat: Januar, Methode: Prioritätsliste"
+    )
     expect(app_page.get_by_test_id("r-cost")).to_contain_text("€")
     expect(app_page.get_by_test_id("r-vars")).to_contain_text("binär")
     expect(app_page.get_by_test_id("day-section")).to_have_count(1)

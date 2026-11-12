@@ -64,6 +64,16 @@ def test_hourly_costs_add_up_to_total_cost(data_dir):
         assert abs(sum(result["hourly_cost_eur"]) - result["total_cost_eur"]) < 1.0
 
 
+def test_schedule_carries_marginal_cost_per_plant(data_dir):
+    # The frontend derives the cost per energy source from marginal_cost and generation
+    result = solve_priority_list("small", 1, data_dir, "day")
+
+    for plant in result["schedule"]:
+        assert plant["marginal_cost"] >= 0
+        plant_cost = sum(plant["generation"]) * plant["marginal_cost"]
+        assert abs(plant_cost - plant["cost_eur"]) < 1.0
+
+
 def test_solver_time_limit_is_applied_and_reported(data_dir):
     # Without a limit this problem needs about 15 s. HiGHS checks the limit only between its
     # work steps (e.g. not in the middle of a cut round), so it may overrun it by several

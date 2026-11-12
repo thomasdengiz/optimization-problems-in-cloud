@@ -64,8 +64,9 @@ export function formatDate(isoDate, locale = "de-DE") {
  * Every profile contains:
  *  - date:    the calendar date of the day
  *  - labels:  hour labels for the x axis
- *  - stacks:  list of { key, color, values } for the stacked supply (negative = pump consumption);
- *             `key` names the series ("hard_coal", "wind", ...) and is translated by the caller
+ *  - stacks:  list of { key, color, values, costEur } for the stacked supply (negative = pump consumption);
+ *             `key` names the series ("hard_coal", "wind", ...) and is translated by the caller;
+ *             costEur is the generation cost of the day (output times marginal cost; 0 without fuel cost)
  *  - load:    the demand line
  *  - costEur: generation cost of this day (null if the result has no hourly costs)
  * Generation of all plants of the same type is summed up.
@@ -81,15 +82,16 @@ export function buildDayProfiles(result) {
     for (const plant of result.schedule) {
       const values = slice(plant.generation);
       if (!byType.has(plant.type)) {
-        byType.set(plant.type, { key: plant.type, color: plant.color, values: values.map(() => 0) });
+        byType.set(plant.type, { key: plant.type, color: plant.color, values: values.map(() => 0), costEur: 0 });
       }
       const entry = byType.get(plant.type);
       values.forEach((value, i) => { entry.values[i] += value; });
+      entry.costEur += values.reduce((sum, value) => sum + value * plant.marginal_cost, 0);
     }
 
     const stacks = [...byType.values()];
-    stacks.push({ key: "wind", color: "#6baed6", values: slice(result.wind) });
-    stacks.push({ key: "pv", color: "#fdd835", values: slice(result.pv) });
+    stacks.push({ key: "wind", color: "#6baed6", values: slice(result.wind), costEur: 0 });
+    stacks.push({ key: "pv", color: "#fdd835", values: slice(result.pv), costEur: 0 });
 
     if (result.pump_schedule.length > 0) {
       const turbining = new Array(end - start).fill(0);
@@ -98,8 +100,8 @@ export function buildDayProfiles(result) {
         slice(pump.turbining).forEach((value, i) => { turbining[i] += value; });
         slice(pump.pumping).forEach((value, i) => { pumping[i] -= value; });
       }
-      stacks.push({ key: "pump_turbining", color: "#17becf", values: turbining });
-      stacks.push({ key: "pump_charging", color: "#9edae5", values: pumping });
+      stacks.push({ key: "pump_turbining", color: "#17becf", values: turbining, costEur: 0 });
+      stacks.push({ key: "pump_charging", color: "#9edae5", values: pumping, costEur: 0 });
     }
 
     const hourlyCosts = result.hourly_cost_eur;
@@ -118,7 +120,7 @@ export function buildDayProfiles(result) {
  * Generation mix of one day profile.
  *  - demandMWh:          sum of the load over the day (hourly MW values, so MWh)
  *  - totalGenerationMWh: sum of all generation of the day (pump charging is consumption and not counted)
- *  - sources:            list of { key, color, energyMWh, share } with share in % of the total generation,
+ *  - sources:            list of { key, color, energyMWh, costEur, share } with share in % of the total generation,
  *                        sorted by energy; sources without generation are left out
  */
 export function buildDayMix(profile) {
@@ -128,6 +130,7 @@ export function buildDayMix(profile) {
       key: stack.key,
       color: stack.color,
       energyMWh: stack.values.reduce((sum, value) => sum + Math.max(value, 0), 0),
+      costEur: stack.costEur,
     }))
     .filter((source) => source.energyMWh > 0)
     .sort((a, b) => b.energyMWh - a.energyMWh);

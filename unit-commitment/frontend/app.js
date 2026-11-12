@@ -81,6 +81,7 @@ const state = {
   charts: [],
   status: null,   // { key, params } of the status line, or { text } for untranslated text
   running: false,
+  runInfo: null,  // country, scenario, horizon, month and method of the last run
 };
 
 /** Translate a key in the selected language. */
@@ -341,6 +342,7 @@ async function solve() {
     mipGapPercent: $("mip-gap").value,
   });
 
+  state.runInfo = { ...request, country: state.country };
   state.running = true;
   updateSolveButton();
 
@@ -380,12 +382,27 @@ async function solve() {
   }
 }
 
+/** Line under the result heading: country, scenario, period, month and method of the last run. */
+function renderRunInfo() {
+  const info = state.runInfo;
+  if (!info) return;
+  const parts = [
+    `${t("runinfo.country")}: ${t(`country.${info.country}`)}`,
+    `${t("runinfo.scenario")}: ${t(`scenario.${info.scenario}`)}`,
+    `${t("runinfo.period")}: ${t(`runinfo.period.${info.horizon}`)}`,
+    `${t("runinfo.month")}: ${MONTH_NAMES[state.language][Number(info.month) - 1]}`,
+    `${t("runinfo.method")}: ${t(`runinfo.method.${info.method}`)}`,
+  ];
+  $("run-info").textContent = parts.join(", ");
+}
+
 /** Fill the result cards, the reasons list and one load profile chart per day. */
 function renderResult() {
   const result = state.result;
   const locale = LOCALES[state.language];
   $("no-result").hidden = true;
   $("result").hidden = false;
+  renderRunInfo();
 
   const solverSeconds = result.solve_time_seconds ?? result.solve_time_ms / 1000;
   const seconds = (value) => (value === null || value === undefined ? "–" : `${formatNumber(value, 1, locale)} s`);
@@ -839,7 +856,7 @@ function drawDonut(canvas, profile, locale) {
             color: source.color,
             share: source.share,
             percentText: `${formatNumber(source.share, 1, locale)} %`,
-            sumText: `${formatNumber(source.energyMWh, 0, locale)} ${t("mix.unit")}`,
+            sumText: `${formatNumber(source.energyMWh, 0, locale)} ${t("mix.unit")} · ${formatNumber(source.costEur, 0, locale)} €`,
           })),
         },
       },

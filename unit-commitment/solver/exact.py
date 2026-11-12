@@ -443,6 +443,7 @@ def solve_exact(
             {
                 "plant_id": plant["id"],
                 "type": plant["type"],
+                "marginal_cost": plant["marginal_cost"],
                 "color": plant["color"],
                 "generation": generation,
                 "online": online,
