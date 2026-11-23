@@ -14,6 +14,7 @@ from concurrent.futures import Future, ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 
 from .exact import NoSolutionFoundError, solve_exact
+from .metaheuristics import solve_ea, solve_pso
 from .priority_list import solve_priority_list
 
 # Log lines end up in the container console (Azure log stream). Worker processes import this
@@ -68,19 +69,26 @@ def run_solve(
     horizon: str,
     time_limit: int,
     mip_gap: float | None,
+    options: dict | None = None,
 ) -> dict:
     """Run one optimization (executed inside a worker process) and return the result dict.
 
+    `options` holds the algorithm parameters of the evolutionary algorithm / particle swarm
+    (only the values the user set; the solver uses its defaults for the rest).
     Start, end and failures are logged so problems can be traced in the server logs.
     """
     description = f"method={method} scenario={scenario} horizon={horizon} month={month}"
-    logger.info("Job started: %s time_limit=%s mip_gap=%s", description, time_limit, mip_gap)
+    logger.info("Job started: %s time_limit=%s mip_gap=%s options=%s", description, time_limit, mip_gap, options)
     start = time.perf_counter()
     try:
         if method == "exact":
             result = solve_exact(scenario, month, DATA_DIR, horizon, time_limit=time_limit, mip_gap=mip_gap)
         elif method == "priority_list":
             result = solve_priority_list(scenario, month, DATA_DIR, horizon)
+        elif method == "ea":
+            result = solve_ea(scenario, month, DATA_DIR, horizon, time_limit=time_limit, **(options or {}))
+        elif method == "pso":
+            result = solve_pso(scenario, month, DATA_DIR, horizon, time_limit=time_limit, **(options or {}))
         else:
             raise ValueError(f"Unknown method: {method}")
     except Exception:

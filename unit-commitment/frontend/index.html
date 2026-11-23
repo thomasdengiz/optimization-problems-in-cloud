@@ -47,13 +47,56 @@
       <select id="method" data-testid="method"></select>
       <p id="method-info" data-testid="method-info" class="info"></p>
 
-      <div id="params-exact" class="params">
+      <div id="params-time-limit" class="params">
         <label for="time-limit" data-i18n="timeLimit.label"></label>
         <input id="time-limit" data-testid="time-limit" type="number" min="1" max="300" value="60">
-        <p class="hint" data-i18n="timeLimit.hint"></p>
+        <p id="time-limit-hint" class="hint"></p>
+      </div>
+
+      <div id="params-exact" class="params">
         <label for="mip-gap" data-i18n="mipGap.label"></label>
         <input id="mip-gap" data-testid="mip-gap" type="number" min="0" max="100" step="0.1" value="1">
         <p class="hint" data-i18n="mipGap.hint"></p>
+      </div>
+
+      <!-- Algorithm parameters of the metaheuristics. The start values come from the server (GET /methods). -->
+      <div id="params-ea" class="params" hidden>
+        <label for="opt-population_size" data-i18n="param.population_size.label"></label>
+        <input id="opt-population_size" data-testid="opt-population_size" type="number" min="4" max="200" step="1">
+        <p class="hint" data-i18n="param.population_size.hint"></p>
+        <label for="opt-generations" data-i18n="param.generations.label"></label>
+        <input id="opt-generations" data-testid="opt-generations" type="number" min="1" max="5000" step="1">
+        <p class="hint" data-i18n="param.generations.hint"></p>
+        <label for="opt-mutation_rate" data-i18n="param.mutation_rate.label"></label>
+        <input id="opt-mutation_rate" data-testid="opt-mutation_rate" type="number" min="0" max="1" step="0.001">
+        <p class="hint" data-i18n="param.mutation_rate.hint"></p>
+        <label for="opt-crossover_rate" data-i18n="param.crossover_rate.label"></label>
+        <input id="opt-crossover_rate" data-testid="opt-crossover_rate" type="number" min="0" max="1" step="0.05">
+        <p class="hint" data-i18n="param.crossover_rate.hint"></p>
+      </div>
+
+      <div id="params-pso" class="params" hidden>
+        <label for="opt-swarm_size" data-i18n="param.swarm_size.label"></label>
+        <input id="opt-swarm_size" data-testid="opt-swarm_size" type="number" min="2" max="200" step="1">
+        <p class="hint" data-i18n="param.swarm_size.hint"></p>
+        <label for="opt-iterations" data-i18n="param.iterations.label"></label>
+        <input id="opt-iterations" data-testid="opt-iterations" type="number" min="1" max="5000" step="1">
+        <p class="hint" data-i18n="param.iterations.hint"></p>
+        <label for="opt-inertia" data-i18n="param.inertia.label"></label>
+        <input id="opt-inertia" data-testid="opt-inertia" type="number" min="0" max="2" step="0.05">
+        <p class="hint" data-i18n="param.inertia.hint"></p>
+        <label for="opt-cognitive" data-i18n="param.cognitive.label"></label>
+        <input id="opt-cognitive" data-testid="opt-cognitive" type="number" min="0" max="4" step="0.1">
+        <p class="hint" data-i18n="param.cognitive.hint"></p>
+        <label for="opt-social" data-i18n="param.social.label"></label>
+        <input id="opt-social" data-testid="opt-social" type="number" min="0" max="4" step="0.1">
+        <p class="hint" data-i18n="param.social.hint"></p>
+      </div>
+
+      <div id="params-seed" class="params" hidden>
+        <label for="opt-seed" data-i18n="param.seed.label"></label>
+        <input id="opt-seed" data-testid="opt-seed" type="number" min="0" step="1">
+        <p class="hint" data-i18n="param.seed.hint"></p>
       </div>
 
       <label for="scenario" data-i18n="scenario.label"></label>

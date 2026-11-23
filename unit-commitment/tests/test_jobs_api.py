@@ -74,17 +74,69 @@ def test_unknown_job_returns_404():
 
 
 @pytest.mark.parametrize(
+    "method, params",
+    [
+        ("ea", {"population_size": 8, "generations": 3, "mutation_rate": 0.01, "crossover_rate": 0.5, "seed": 3}),
+        ("pso", {"swarm_size": 8, "iterations": 3, "inertia": 0.8, "cognitive": 1.0, "social": 2.0, "seed": 3}),
+    ],
+)
+def test_metaheuristic_job_uses_the_given_parameters(method, params):
+    job_id = client.post(
+        "/solve",
+        json={"method": method, "scenario": "small", "horizon": "day", "month": 1, "time_limit": 60, **params},
+    ).json()["job_id"]
+
+    job = wait_for_job(job_id)
+
+    assert job["status"] == "done"
+    result = job["result"]
+    assert result["method"] == method
+    assert result["feasible"] is True
+    assert result["parameters"] == params
+    assert result["solve_time_ms"] > 0
+
+
+def test_parameters_of_another_method_are_ignored():
+    job_id = client.post(
+        "/solve",
+        json={"method": "ea", "scenario": "small", "population_size": 8, "generations": 2, "swarm_size": 50},
+    ).json()["job_id"]
+
+    job = wait_for_job(job_id)
+
+    assert job["status"] == "done"
+    assert "swarm_size" not in job["result"]["parameters"]
+
+
+def test_metaheuristic_is_rejected_when_the_population_does_not_fit_into_the_server_memory(monkeypatch):
+    monkeypatch.setattr("solver.api.memory_limit_mb", lambda: 200.0)
+
+    response = client.post(
+        "/solve",
+        json={"method": "ea", "scenario": "large", "horizon": "month", "population_size": 200},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"]["code"] == "memory_too_small"
+
+
+@pytest.mark.parametrize(
     "payload, expected_status",
     [
         ({"scenario": "huge"}, 400),
         ({"horizon": "year"}, 400),
         ({"month": 13}, 400),
         ({"method": "magic"}, 400),
-        ({"method": "ea"}, 400),
+        ({"method": "custom"}, 400),
         ({"time_limit": 0}, 422),
         ({"time_limit": 100000}, 422),
         ({"mip_gap": -0.1}, 422),
         ({"mip_gap": 2}, 422),
+        ({"method": "ea", "population_size": 2}, 422),
+        ({"method": "ea", "mutation_rate": 1.5}, 422),
+        ({"method": "ea", "generations": 0}, 422),
+        ({"method": "pso", "swarm_size": 1}, 422),
+        ({"method": "pso", "inertia": -1}, 422),
     ],
 )
 def test_invalid_requests_are_rejected(payload, expected_status):

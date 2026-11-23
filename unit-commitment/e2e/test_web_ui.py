@@ -80,10 +80,66 @@ def test_exact_method_shows_gap_and_solver_time(app_page: Page):
     expect(app_page.get_by_test_id("r-gap")).not_to_have_text("")
 
 
+def test_metaheuristic_parameter_fields_follow_the_chosen_method(app_page: Page):
+    select_germany(app_page)
+
+    app_page.get_by_test_id("method").select_option("ea")
+    expect(app_page.get_by_test_id("opt-population_size")).to_be_visible()
+    expect(app_page.get_by_test_id("opt-population_size")).to_have_value("40")   # default from the server
+    expect(app_page.get_by_test_id("opt-swarm_size")).to_be_hidden()
+    expect(app_page.get_by_test_id("opt-seed")).to_be_visible()
+    expect(app_page.get_by_test_id("time-limit")).to_be_visible()
+    expect(app_page.get_by_test_id("mip-gap")).to_be_hidden()
+
+    app_page.get_by_test_id("method").select_option("pso")
+    expect(app_page.get_by_test_id("opt-swarm_size")).to_be_visible()
+    expect(app_page.get_by_test_id("opt-inertia")).to_have_value("0.9")
+    expect(app_page.get_by_test_id("opt-population_size")).to_be_hidden()
+
+    app_page.get_by_test_id("method").select_option("exact")
+    expect(app_page.get_by_test_id("opt-swarm_size")).to_be_hidden()
+    expect(app_page.get_by_test_id("opt-seed")).to_be_hidden()
+    expect(app_page.get_by_test_id("mip-gap")).to_be_visible()
+
+
+def test_evolutionary_algorithm_small_day_shows_results(app_page: Page):
+    select_germany(app_page)
+    app_page.get_by_test_id("method").select_option("ea")
+    app_page.get_by_test_id("opt-population_size").fill("10")
+    app_page.get_by_test_id("opt-generations").fill("5")
+    app_page.get_by_test_id("scenario").select_option("small")
+    app_page.get_by_test_id("horizon").select_option("day")
+
+    app_page.get_by_test_id("solve-button").click()
+
+    expect(app_page.get_by_test_id("r-feasible")).to_have_text("ja", timeout=60000)
+    expect(app_page.get_by_test_id("run-info")).to_contain_text("Methode: Evolutionärer Algorithmus")
+    expect(app_page.get_by_test_id("r-cost")).to_contain_text("€")
+    expect(app_page.get_by_test_id("limit-note")).to_be_hidden()
+    expect(app_page.locator("#days canvas")).to_be_visible()
+
+
+def test_particle_swarm_small_day_shows_results(app_page: Page):
+    select_germany(app_page)
+    app_page.get_by_test_id("method").select_option("pso")
+    app_page.get_by_test_id("opt-swarm_size").fill("10")
+    app_page.get_by_test_id("opt-iterations").fill("5")
+    app_page.get_by_test_id("scenario").select_option("small")
+    app_page.get_by_test_id("horizon").select_option("day")
+
+    app_page.get_by_test_id("solve-button").click()
+
+    expect(app_page.get_by_test_id("r-feasible")).to_have_text("ja", timeout=60000)
+    expect(app_page.get_by_test_id("run-info")).to_contain_text("Methode: Partikelschwarm")
+    expect(app_page.locator("#days canvas")).to_be_visible()
+
+
 def test_unimplemented_methods_are_greyed_out_and_cannot_be_chosen(app_page: Page):
     select_germany(app_page)
 
-    expect(app_page.locator("#method option[value=ea]")).to_be_disabled()
+    expect(app_page.locator("#method option[value=custom]")).to_be_disabled()
+    expect(app_page.locator("#method option[value=ea]")).to_be_enabled()
+    expect(app_page.locator("#method option[value=pso]")).to_be_enabled()
     expect(app_page.locator("#method option[value=exact]")).to_be_enabled()
     expect(app_page.locator("#method option[value=priority_list]")).to_be_enabled()
     assert app_page.get_by_test_id("method").input_value() == "exact"

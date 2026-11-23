@@ -10,9 +10,20 @@ export function numberOfDays(hours) {
 }
 
 /**
+ * Algorithm parameters the user can set per metaheuristic. The names are the field names of
+ * POST /solve and the suffix of the input ids ("opt-population_size").
+ */
+export const METHOD_PARAMS = {
+  ea: ["population_size", "generations", "mutation_rate", "crossover_rate", "seed"],
+  pso: ["swarm_size", "iterations", "inertia", "cognitive", "social", "seed"],
+};
+
+/**
  * Build the JSON body for POST /solve from the form values.
  * The MIP gap is entered in percent in the UI but sent as a fraction.
- * Time limit and gap are only sent for the exact method.
+ * The time limit is sent for the exact method and the metaheuristics, the gap only for the exact
+ * method, and the algorithm parameters (form.params, name -> text) only for the chosen metaheuristic.
+ * Empty parameters are left out so the server uses its default.
  */
 export function buildSolveRequest(form) {
   const request = {
@@ -21,10 +32,17 @@ export function buildSolveRequest(form) {
     horizon: form.horizon,
     month: Number(form.month),
   };
-  if (form.method === "exact") {
+  const isMetaheuristic = form.method in METHOD_PARAMS;
+  if (form.method === "exact" || isMetaheuristic) {
     request.time_limit = Number(form.timeLimit);
-    if (form.mipGapPercent !== "" && form.mipGapPercent !== null) {
-      request.mip_gap = Number(form.mipGapPercent) / 100;
+  }
+  if (form.method === "exact" && form.mipGapPercent !== "" && form.mipGapPercent !== null) {
+    request.mip_gap = Number(form.mipGapPercent) / 100;
+  }
+  if (isMetaheuristic) {
+    for (const name of METHOD_PARAMS[form.method]) {
+      const value = form.params?.[name];
+      if (value !== "" && value !== null && value !== undefined) request[name] = Number(value);
     }
   }
   return request;

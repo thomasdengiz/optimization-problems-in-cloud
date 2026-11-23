@@ -8,7 +8,7 @@ POST /benchmark
 
 Environment variables:
   CORS_ORIGINS    comma-separated allowed browser origins (default: *)
-  MAX_TIME_LIMIT  upper bound for the exact solver time limit in seconds (default: 300)
+  MAX_TIME_LIMIT  upper bound for the time limit of the exact solver and the metaheuristics in seconds (default: 300)
   SOLVER_WORKERS  number of parallel worker processes (default: 2)
 """
 import os
@@ -21,6 +21,9 @@ from pydantic import BaseModel, Field
 
 from .exact         import HORIZONS, estimate_exact_memory_mb, solve_exact
 from .jobs          import DATA_DIR, job_manager, logger, memory_limit_mb
+from .metaheuristics import (
+    EA_DEFAULTS, PSO_DEFAULTS, estimate_metaheuristic_memory_mb, solve_ea, solve_pso,
+)
 from .priority_list import solve_priority_list
 
 MAX_TIME_LIMIT = int(os.environ.get("MAX_TIME_LIMIT", "300"))
@@ -61,15 +64,17 @@ METHODS = {
     },
     "ea": {
         "label":     "Evolutionary Algorithm",
-        "available": False,
-        "scenarios": [],
-        "description": "Coming soon.",
+        "available": True,
+        "scenarios": ["small", "medium", "large"],
+        "description": "Population-based search over on/off states and outputs; every plan is repaired to satisfy the constraints.",
+        "defaults":  EA_DEFAULTS,
     },
     "pso": {
         "label":     "Particle Swarm Optimization",
-        "available": False,
-        "scenarios": [],
-        "description": "Coming soon.",
+        "available": True,
+        "scenarios": ["small", "medium", "large"],
+        "description": "Swarm of candidate plans that move towards their own best and the swarm's best plan; every plan is repaired.",
+        "defaults":  PSO_DEFAULTS,
     },
     "custom": {
         "label":     "Custom Heuristic",
@@ -92,8 +97,32 @@ class SolveRequest(BaseModel):
     horizon:  str = "day"     # day | week | month
     month:    int = 1         # 1-12
     method:   str = "priority_list"
-    time_limit: int = Field(120, gt=0, le=MAX_TIME_LIMIT)    # seconds, exact method only
+    time_limit: int = Field(120, gt=0, le=MAX_TIME_LIMIT)    # seconds, exact method and metaheuristics
     mip_gap:  float | None = Field(None, ge=0, le=1)         # relative gap, exact method only
+    seed:     int | None = Field(None, ge=0, le=2**32 - 1)   # random seed, EA and PSO
+    # Evolutionary algorithm (None = default from solver/metaheuristics.py)
+    population_size: int | None   = Field(None, ge=4, le=200)
+    generations:     int | None   = Field(None, ge=1, le=5000)
+    mutation_rate:   float | None = Field(None, ge=0, le=1)
+    crossover_rate:  float | None = Field(None, ge=0, le=1)
+    # Particle swarm optimization
+    swarm_size: int | None   = Field(None, ge=2, le=200)
+    iterations: int | None   = Field(None, ge=1, le=5000)
+    inertia:    float | None = Field(None, ge=0, le=2)
+    cognitive:  float | None = Field(None, ge=0, le=4)
+    social:     float | None = Field(None, ge=0, le=4)
+
+
+METHOD_OPTIONS = {
+    "ea":  ("population_size", "generations", "mutation_rate", "crossover_rate", "seed"),
+    "pso": ("swarm_size", "iterations", "inertia", "cognitive", "social", "seed"),
+}
+
+
+def method_options(req: SolveRequest) -> dict:
+    """The algorithm parameters the user set for the chosen method (parameters of other methods are ignored)."""
+    names = METHOD_OPTIONS.get(req.method, ())
+    return {name: getattr(req, name) for name in names if getattr(req, name) is not None}
 
 
 @app.get("/health")
@@ -142,6 +171,26 @@ def solve(req: SolveRequest):
                 },
             )
 
+    # The metaheuristics keep the whole population in memory: size grows with population x hours x plants
+    if req.method in METHOD_OPTIONS and limit is not None:
+        defaults = METHODS[req.method]["defaults"]
+        key = "population_size" if req.method == "ea" else "swarm_size"
+        population = getattr(req, key) or defaults[key]
+        needed = estimate_metaheuristic_memory_mb(req.scenario, req.month, DATA_DIR, req.horizon, population)
+        if needed > limit:
+            raise HTTPException(
+                400,
+                {
+                    "code": "memory_too_small",
+                    "message": (
+                        f"This combination needs about {needed:.0f} MB of memory, the server has "
+                        f"{limit:.0f} MB. Choose a smaller population, a smaller scenario or a shorter period."
+                    ),
+                    "needed_mb": round(needed),
+                    "limit_mb": round(limit),
+                },
+            )
+
     try:
         job_id = job_manager.submit(
             method=req.method,
@@ -150,6 +199,7 @@ def solve(req: SolveRequest):
             horizon=req.horizon,
             time_limit=req.time_limit,
             mip_gap=req.mip_gap,
+            options=method_options(req),
         )
     except Exception as error:
         # An HTTPException keeps the CORS headers, so the browser can show the message
@@ -187,6 +237,10 @@ def benchmark(req: SolveRequest):
                 r = solve_exact(req.scenario, req.month, DATA_DIR, req.horizon)
             elif method == "priority_list":
                 r = solve_priority_list(req.scenario, req.month, DATA_DIR, req.horizon)
+            elif method == "ea":
+                r = solve_ea(req.scenario, req.month, DATA_DIR, req.horizon, time_limit=req.time_limit)
+            elif method == "pso":
+                r = solve_pso(req.scenario, req.month, DATA_DIR, req.horizon, time_limit=req.time_limit)
             elapsed = (time.perf_counter() - start) * 1000
             results[method] = {
                 "label":          METHODS[method]["label"],

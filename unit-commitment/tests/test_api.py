@@ -25,3 +25,7 @@ def test_methods_endpoint_lists_available_methods():
     methods = response.json()
     assert methods["exact"]["available"] is True
     assert methods["priority_list"]["available"] is True
+    assert methods["ea"]["available"] is True
+    assert methods["pso"]["available"] is True
+    assert methods["ea"]["defaults"]["population_size"] > 0
+    assert methods["pso"]["defaults"]["inertia"] > 0

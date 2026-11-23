@@ -3,7 +3,7 @@
  * Pure helper functions live in lib.js, all texts in i18n.js.
  */
 import {
-  buildDayMix, buildDayProfiles, buildSolveRequest, formatDate, formatGap, formatNumber,
+  buildDayMix, buildDayProfiles, buildSolveRequest, formatDate, formatGap, formatNumber, METHOD_PARAMS,
 } from "./lib.js";
 import {
   detectLanguage, infoText, LOCALES, MONTH_NAMES, translate,
@@ -174,8 +174,16 @@ function renderMethodOptions() {
 
 /** Short explanations below method, scenario and month; they change with the selection. */
 function renderInfoTexts() {
-  $("params-exact").hidden = $("method").value !== "exact";   // time limit and gap only apply to the exact method
   const method = $("method").value;
+  const isMetaheuristic = method in METHOD_PARAMS;
+  // Which input groups apply: the time limit to the exact method and the metaheuristics, the gap only to
+  // the exact method, the algorithm parameters to the chosen metaheuristic
+  $("params-time-limit").hidden = !(method === "exact" || isMetaheuristic);
+  $("params-exact").hidden = method !== "exact";
+  $("params-ea").hidden = method !== "ea";
+  $("params-pso").hidden = method !== "pso";
+  $("params-seed").hidden = !isMetaheuristic;
+  $("time-limit-hint").textContent = t(isMetaheuristic ? "timeLimit.hintHeuristic" : "timeLimit.hint");
   $("method-info").textContent = method ? infoText(state.language, "method", method) : "";
   $("scenario-info").textContent = infoText(state.language, "scenario", $("scenario").value);
   $("horizon-info").textContent = infoText(state.language, "horizon", $("horizon").value);
@@ -241,6 +249,15 @@ async function waitForServer(onWaiting, timeoutMs = Infinity) {
   }
 }
 
+/** Put the default algorithm parameters of the server (GET /methods) into the input fields. */
+function fillParameterDefaults() {
+  for (const info of Object.values(state.methods)) {
+    for (const [name, value] of Object.entries(info.defaults ?? {})) {
+      $(`opt-${name}`).value = value;
+    }
+  }
+}
+
 /** Wait for the backend and then load the method list. */
 async function connectToServer() {
   const banner = $("server-banner");
@@ -249,6 +266,7 @@ async function connectToServer() {
 
   state.methods = await (await fetch(`${API}/methods`)).json();
   renderMethodOptions();
+  fillParameterDefaults();
   $("method").value = "exact";
   renderInfoTexts();
   updateSolveButton();
@@ -340,6 +358,9 @@ async function solve() {
     month: $("month").value,
     timeLimit: $("time-limit").value,
     mipGapPercent: $("mip-gap").value,
+    params: Object.fromEntries(
+      Object.values(METHOD_PARAMS).flat().map((name) => [name, $(`opt-${name}`).value]),
+    ),
   });
 
   state.runInfo = { ...request, country: state.country };
@@ -420,6 +441,7 @@ function renderResult() {
   feasible.textContent = result.feasible ? t("result.yes") : t("result.no");
   feasible.className = result.feasible ? "feasible-yes" : "feasible-no";
   $("limit-note").hidden = !result.stopped_at_time_limit;
+  $("limit-note").textContent = t(result.method in METHOD_PARAMS ? "result.limitReachedHeuristic" : "result.limitReached");
 
   const reasons = $("reasons");
   reasons.replaceChildren();
