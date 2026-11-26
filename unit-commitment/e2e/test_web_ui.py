@@ -251,3 +251,80 @@ def test_unreachable_server_shows_helpful_message(app_page: Page):
     app_page.get_by_test_id("solve-button").click()
 
     expect(app_page.get_by_test_id("status")).to_contain_text("Server wird aufgeweckt")
+
+
+def test_comparison_shows_checkboxes_and_the_parameters_of_the_ticked_methods(app_page: Page):
+    select_germany(app_page)
+    app_page.get_by_test_id("method").select_option("compare")
+
+    for key in ("exact", "priority_list", "ea", "pso"):
+        expect(app_page.get_by_test_id(f"compare-{key}")).to_be_checked()
+    expect(app_page.get_by_test_id("time-limit")).to_be_visible()
+    expect(app_page.get_by_test_id("mip-gap")).to_be_visible()
+    expect(app_page.get_by_test_id("opt-population_size")).to_be_visible()
+    expect(app_page.get_by_test_id("opt-swarm_size")).to_be_visible()
+    expect(app_page.get_by_test_id("opt-seed")).to_be_visible()
+    expect(app_page.get_by_test_id("solve-button")).to_be_enabled()
+
+    app_page.get_by_test_id("compare-exact").uncheck()
+    app_page.get_by_test_id("compare-ea").uncheck()
+    expect(app_page.get_by_test_id("mip-gap")).to_be_hidden()
+    expect(app_page.get_by_test_id("opt-population_size")).to_be_hidden()
+    expect(app_page.get_by_test_id("opt-swarm_size")).to_be_visible()
+
+    app_page.get_by_test_id("compare-pso").uncheck()   # only the priority list is left: no comparison
+    expect(app_page.get_by_test_id("time-limit")).to_be_hidden()
+    expect(app_page.get_by_test_id("solve-button")).to_be_disabled()
+
+
+def test_comparison_runs_all_methods_and_shows_charts_table_and_method_dropdown(app_page: Page):
+    select_germany(app_page)
+    app_page.get_by_test_id("method").select_option("compare")
+    app_page.get_by_test_id("scenario").select_option("small")
+    app_page.get_by_test_id("horizon").select_option("day")
+    app_page.get_by_test_id("time-limit").fill("10")
+    app_page.get_by_test_id("opt-population_size").fill("10")
+    app_page.get_by_test_id("opt-generations").fill("5")
+    app_page.get_by_test_id("opt-swarm_size").fill("10")
+    app_page.get_by_test_id("opt-iterations").fill("5")
+
+    app_page.get_by_test_id("solve-button").click()
+
+    expect(app_page.get_by_test_id("view-compare")).to_be_visible(timeout=180000)
+    expect(app_page.get_by_test_id("view-compare")).to_have_attribute("aria-pressed", "true")
+    expect(app_page.get_by_test_id("run-info")).to_contain_text("Methode: Vergleich")
+    expect(app_page.get_by_test_id("compare-cost-chart")).to_be_visible()
+    expect(app_page.get_by_test_id("compare-percent-chart")).to_be_visible()
+    expect(app_page.get_by_test_id("compare-row")).to_have_count(4)
+    expect(app_page.get_by_test_id("r-cost")).to_be_hidden()   # the single-result cards belong to the other views
+    expect(app_page.get_by_test_id("compare-method")).to_be_hidden()
+
+    # exactly one method is the best and shows 100 %
+    best = app_page.locator("tr.is-best")
+    expect(best).to_have_count(1)
+    expect(best).to_contain_text("100,0 %")
+    # the exact method cannot be beaten (up to its gap), so every other method is at least about 100 %
+    for percent in app_page.locator("#compare-table tbody tr td:nth-child(3)").all_inner_texts():
+        assert float(percent.split(" ")[0].replace(",", ".")) >= 100.0
+
+    # load profile / generation mix of a single method of the comparison
+    app_page.get_by_test_id("view-load").click()
+    expect(app_page.get_by_test_id("compare-method")).to_be_visible()
+    expect(app_page.get_by_test_id("r-cost")).to_be_visible()
+    expect(app_page.locator("#days canvas")).to_be_visible()
+    app_page.get_by_test_id("compare-method").select_option("ea")
+    expect(app_page.get_by_test_id("run-info")).to_contain_text("Methode: Evolutionärer Algorithmus")
+    app_page.locator('[data-view="mix"]').click()
+    expect(app_page.get_by_test_id("compare-method")).to_have_value("ea")
+    expect(app_page.locator("#days .donut-box canvas")).to_be_visible()
+
+    # back to the comparison
+    app_page.get_by_test_id("view-compare").click()
+    expect(app_page.get_by_test_id("compare-cost-chart")).to_be_visible()
+
+    # a normal run afterwards removes the comparison tab and the dropdown again
+    app_page.get_by_test_id("method").select_option("priority_list")
+    app_page.get_by_test_id("solve-button").click()
+    expect(app_page.get_by_test_id("r-feasible")).to_have_text("ja", timeout=60000)
+    expect(app_page.get_by_test_id("view-compare")).to_be_hidden()
+    expect(app_page.get_by_test_id("compare-method")).to_be_hidden()

@@ -68,3 +68,15 @@ option:disabled { color: #9aa5b1; }
 .view-toggle button[aria-pressed="true"] { background: var(--accent); color: #fff; }
 .view-toggle button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .donut-box { height: 400px; }
+.checks { display: flex; flex-wrap: wrap; gap: .4rem 1.2rem; }
+.checks .check { display: flex; align-items: center; gap: .4rem; margin: .2rem 0; font-weight: 400; }
+.checks .check input { width: auto; margin: 0; }
+.method-picker { max-width: 320px; }
+.method-picker[hidden], #single-details[hidden], #comparison[hidden], #days[hidden] { display: none; }
+.compare-box { height: 280px; margin-bottom: 1rem; }
+#comparison h4 { margin: 1rem 0 .4rem; }
+.table-wrap { overflow-x: auto; }
+#compare-table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+#compare-table th, #compare-table td { padding: .45rem .6rem; border-bottom: 1px solid var(--border); text-align: left; }
+#compare-table th { color: #57606a; font-weight: 600; }
+#compare-table tr.is-best td { font-weight: 700; color: #1a7f37; }

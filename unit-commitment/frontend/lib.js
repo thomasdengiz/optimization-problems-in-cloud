@@ -48,6 +48,47 @@ export function buildSolveRequest(form) {
   return request;
 }
 
+/**
+ * Prepare the results of a method comparison for the charts and the table.
+ *
+ * `runs` is a list of { key, result, error }: `result` is the finished solution of the method,
+ * `error` the message if the method delivered nothing. Every returned row has
+ *  - key, status ("ok", "infeasible" or "failed"), error
+ *  - costEur, seconds (total run time), stoppedAtLimit
+ *  - percentOfBest: cost in % of the cheapest feasible method (that one is 100), null without a feasible cost
+ *  - isBest: true for the cheapest feasible method
+ * Only feasible results are compared: an infeasible plan cannot be called cheaper than a valid one.
+ */
+export function buildComparison(runs) {
+  const rows = runs.map((run) => {
+    const { result } = run;
+    if (!result) {
+      return {
+        key: run.key, status: "failed", error: run.error ?? null, costEur: null, seconds: null,
+        stoppedAtLimit: false, percentOfBest: null, isBest: false,
+      };
+    }
+    return {
+      key: run.key,
+      status: result.feasible ? "ok" : "infeasible",
+      error: null,
+      costEur: result.total_cost_eur,
+      seconds: result.solve_time_ms / 1000,
+      stoppedAtLimit: Boolean(result.stopped_at_time_limit),
+      percentOfBest: null,
+      isBest: false,
+    };
+  });
+
+  const feasible = rows.filter((row) => row.status === "ok");
+  const bestCostEur = feasible.length > 0 ? Math.min(...feasible.map((row) => row.costEur)) : null;
+  for (const row of feasible) {
+    row.percentOfBest = bestCostEur > 0 ? (row.costEur / bestCostEur) * 100 : 100;
+    row.isBest = row.costEur === bestCostEur;
+  }
+  return { rows, bestCostEur };
+}
+
 /** Format a number with a fixed number of decimals for the given locale ("de-DE" or "en-US"). */
 export function formatNumber(value, decimals = 0, locale = "de-DE") {
   return new Intl.NumberFormat(locale, {

@@ -47,6 +47,13 @@
       <select id="method" data-testid="method"></select>
       <p id="method-info" data-testid="method-info" class="info"></p>
 
+      <!-- Only shown for "Comparison of different methods": which methods take part. The checkboxes are created in app.js. -->
+      <div id="params-compare" class="params" hidden>
+        <label data-i18n="compare.label"></label>
+        <div id="compare-methods" data-testid="compare-methods" class="checks"></div>
+        <p class="hint" data-i18n="compare.hint"></p>
+      </div>
+
       <div id="params-time-limit" class="params">
         <label for="time-limit" data-i18n="timeLimit.label"></label>
         <input id="time-limit" data-testid="time-limit" type="number" min="1" max="300" value="60">
@@ -133,6 +140,7 @@
 
       <div id="result" hidden>
         <p id="run-info" data-testid="run-info" class="info"></p>
+        <div id="single-details">
         <div class="cards">
           <div class="card"><span data-i18n="result.cost"></span><strong id="r-cost" data-testid="r-cost"></strong></div>
           <div class="card"><span data-i18n="result.solverTime"></span><strong id="r-solver-time" data-testid="r-solver-time"></strong></div>
@@ -144,15 +152,44 @@
         </div>
         <p id="limit-note" data-testid="limit-note" class="note" data-i18n="result.limitReached" hidden></p>
         <ul id="reasons" data-testid="reasons"></ul>
+        </div>
 
         <div class="view-head">
           <h3 data-i18n="profile.heading"></h3>
           <div class="view-toggle">
             <button type="button" data-view="load" data-testid="view-load" aria-pressed="true" data-i18n="view.load"></button>
             <button type="button" data-view="mix" data-testid="view-mix" aria-pressed="false" data-i18n="view.mix"></button>
+            <button type="button" data-view="compare" data-testid="view-compare" aria-pressed="false" data-i18n="view.compare" hidden></button>
           </div>
         </div>
+
+        <!-- After a comparison: which of the compared methods the load profile / generation mix shows -->
+        <div id="method-picker" class="method-picker" hidden>
+          <label for="compare-method" data-i18n="compare.showMethod"></label>
+          <select id="compare-method" data-testid="compare-method"></select>
+        </div>
         <div id="days" data-testid="days"></div>
+
+        <div id="comparison" data-testid="comparison" hidden>
+          <h4 data-i18n="compare.costHeading"></h4>
+          <div class="chart-box compare-box"><canvas id="compare-cost-chart" data-testid="compare-cost-chart"></canvas></div>
+          <h4 data-i18n="compare.percentHeading"></h4>
+          <div class="chart-box compare-box"><canvas id="compare-percent-chart" data-testid="compare-percent-chart"></canvas></div>
+          <div class="table-wrap">
+            <table id="compare-table" data-testid="compare-table">
+              <thead>
+                <tr>
+                  <th data-i18n="compare.col.method"></th>
+                  <th data-i18n="compare.col.cost"></th>
+                  <th data-i18n="compare.col.percent"></th>
+                  <th data-i18n="compare.col.time"></th>
+                  <th data-i18n="compare.col.status"></th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </section>
   </main>

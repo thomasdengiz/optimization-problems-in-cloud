@@ -3,7 +3,8 @@
  * Pure helper functions live in lib.js, all texts in i18n.js.
  */
 import {
-  buildDayMix, buildDayProfiles, buildSolveRequest, formatDate, formatGap, formatNumber, METHOD_PARAMS,
+  buildComparison, buildDayMix, buildDayProfiles, buildSolveRequest, formatDate, formatGap, formatNumber,
+  METHOD_PARAMS,
 } from "./lib.js";
 import {
   detectLanguage, infoText, LOCALES, MONTH_NAMES, translate,
@@ -29,6 +30,16 @@ const SERIES_ICONS = {
   pump_turbining: "icons/pump_turbining.svg",
   pump_charging: "icons/pump_charging.svg",
   load: "icons/load.svg",
+};
+
+// Value of the method dropdown for the comparison of several methods (not a method of the server)
+const COMPARE = "compare";
+// Bar colour of each method in the comparison charts
+const METHOD_COLORS = {
+  exact: "#0b6e4f",
+  priority_list: "#6baed6",
+  ea: "#e6850e",
+  pso: "#8250df",
 };
 
 // Global Chart.js look: system font and a softer grey for text
@@ -76,8 +87,10 @@ const state = {
   language: detectLanguage(localStorage.getItem(LANGUAGE_STORAGE_KEY), navigator.language),
   country: null,
   methods: {},
-  result: null,
-  view: "load", // "load" (load profile, default) or "mix" (generation mix donut)
+  result: null,   // the result shown in the cards and in the load profile / generation mix
+  compare: null,  // after a comparison: { runs: [{ key, result, error }] } in the order of the run
+  compareMethod: null, // method of the comparison whose result is shown in `result`
+  view: "load", // "load" (load profile, default), "mix" (generation mix donut) or "compare"
   charts: [],
   status: null,   // { key, params } of the status line, or { text } for untranslated text
   running: false,
@@ -136,10 +149,27 @@ function renderStatus() {
   }
 }
 
-/** Enable the solve button only if a country is chosen, the chosen method exists and no job runs. */
+/** Methods ticked for the comparison, in the order of the checkboxes. */
+function selectedCompareMethods() {
+  return [...$("compare-methods").querySelectorAll("input:checked")].map((input) => input.value);
+}
+
+/** The methods that will run: the ticked ones for the comparison, else the chosen method. */
+function activeMethods() {
+  const method = $("method").value;
+  return method === COMPARE ? selectedCompareMethods() : [method];
+}
+
+/**
+ * Enable the solve button only if a country is chosen, no job runs and the chosen method exists
+ * (for the comparison: at least two methods are ticked).
+ */
 function updateSolveButton() {
-  const method = state.methods[$("method").value];
-  $("solve").disabled = !(state.country && method && method.available && !state.running);
+  const method = $("method").value;
+  const ready = method === COMPARE
+    ? selectedCompareMethods().length >= 2
+    : Boolean(state.methods[method]?.available);
+  $("solve").disabled = !(state.country && ready && !state.running);
 }
 
 /** Month names in the selected language; keeps the selected month. */
@@ -169,21 +199,53 @@ function renderMethodOptions() {
     option.textContent = info.available ? label : `${label} ${t("method.soon")}`;
     select.appendChild(option);
   }
+  if (Object.keys(state.methods).length > 0) {
+    const compareOption = document.createElement("option");
+    compareOption.value = COMPARE;
+    compareOption.textContent = t("method.compare");
+    select.appendChild(compareOption);
+  }
   if (select.options.length > 0) select.value = selected;
+}
+
+/** Checkboxes of the comparison: one per available method (all ticked at first, later ticks are kept). */
+function renderCompareChoices() {
+  const container = $("compare-methods");
+  const firstTime = container.children.length === 0;
+  const ticked = new Set(selectedCompareMethods());
+  container.replaceChildren();
+  for (const [key, info] of Object.entries(state.methods)) {
+    if (!info.available) continue;
+    const label = document.createElement("label");
+    label.className = "check";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.value = key;
+    input.checked = firstTime || ticked.has(key);
+    input.setAttribute("data-testid", `compare-${key}`);
+    input.addEventListener("change", () => { renderInfoTexts(); updateSolveButton(); });
+    label.append(input, ` ${t(`runinfo.method.${key}`)}`);
+    container.appendChild(label);
+  }
 }
 
 /** Short explanations below method, scenario and month; they change with the selection. */
 function renderInfoTexts() {
   const method = $("method").value;
+  const active = activeMethods();
   const isMetaheuristic = method in METHOD_PARAMS;
   // Which input groups apply: the time limit to the exact method and the metaheuristics, the gap only to
-  // the exact method, the algorithm parameters to the chosen metaheuristic
-  $("params-time-limit").hidden = !(method === "exact" || isMetaheuristic);
-  $("params-exact").hidden = method !== "exact";
-  $("params-ea").hidden = method !== "ea";
-  $("params-pso").hidden = method !== "pso";
-  $("params-seed").hidden = !isMetaheuristic;
-  $("time-limit-hint").textContent = t(isMetaheuristic ? "timeLimit.hintHeuristic" : "timeLimit.hint");
+  // the exact method, the algorithm parameters to the chosen metaheuristic. In the comparison the groups
+  // of all ticked methods are shown.
+  $("params-compare").hidden = method !== COMPARE;
+  $("params-time-limit").hidden = !active.some((key) => key === "exact" || key in METHOD_PARAMS);
+  $("params-exact").hidden = !active.includes("exact");
+  $("params-ea").hidden = !active.includes("ea");
+  $("params-pso").hidden = !active.includes("pso");
+  $("params-seed").hidden = !active.some((key) => key in METHOD_PARAMS);
+  let hintKey = isMetaheuristic ? "timeLimit.hintHeuristic" : "timeLimit.hint";
+  if (method === COMPARE) hintKey = "timeLimit.hintCompare";
+  $("time-limit-hint").textContent = t(hintKey);
   $("method-info").textContent = method ? infoText(state.language, "method", method) : "";
   $("scenario-info").textContent = infoText(state.language, "scenario", $("scenario").value);
   $("horizon-info").textContent = infoText(state.language, "horizon", $("horizon").value);
@@ -222,6 +284,7 @@ function applyLanguage() {
   }
   renderMonthOptions();
   renderMethodOptions();
+  renderCompareChoices();
   renderInfoTexts();
   renderCountryInfo();
   renderStatus();
@@ -266,6 +329,7 @@ async function connectToServer() {
 
   state.methods = await (await fetch(`${API}/methods`)).json();
   renderMethodOptions();
+  renderCompareChoices();
   fillParameterDefaults();
   $("method").value = "exact";
   renderInfoTexts();
@@ -308,8 +372,9 @@ async function initMap() {
 /**
  * Ask the server for the state of a job until it is done. Short connection problems are
  * retried (the server may be restarting); a job the server forgot raises JobLostError.
+ * `step` ({ n, total, name }) is given during a comparison and is shown in the status line.
  */
-async function waitForJob(jobId) {
+async function waitForJob(jobId, step = null) {
   const startedAt = Date.now();
   let failures = 0;
   for (;;) {
@@ -334,7 +399,9 @@ async function waitForJob(jobId) {
     if (job.status === "failed") throw new ApiError(job.error, job.error_code);
 
     const seconds = Math.round((Date.now() - startedAt) / 1000);
-    setStatus(job.status === "queued" ? "status.queued" : "status.running", { seconds });
+    const queued = job.status === "queued";
+    if (step) setStatus(queued ? "status.compareQueued" : "status.compareRunning", { seconds, ...step });
+    else setStatus(queued ? "status.queued" : "status.running", { seconds });
     await sleep(POLL_INTERVAL_MS);
   }
 }
@@ -349,10 +416,10 @@ async function rejectionError(response) {
   return new ApiError(typeof detail === "string" ? detail : t("error.rejected", { status: response.status }));
 }
 
-/** Start a job, poll until it is finished and display the outcome. */
-async function solve() {
-  const request = buildSolveRequest({
-    method: $("method").value,
+/** The /solve request body for one method, built from the current form values. */
+function requestFor(method) {
+  return buildSolveRequest({
+    method,
     scenario: $("scenario").value,
     horizon: $("horizon").value,
     month: $("month").value,
@@ -362,15 +429,59 @@ async function solve() {
       Object.values(METHOD_PARAMS).flat().map((name) => [name, $(`opt-${name}`).value]),
     ),
   });
+}
 
-  state.runInfo = { ...request, country: state.country };
+/** Submit one job, wait until it is finished and return its result (throws on any failure). */
+async function runJob(request, step = null) {
+  const response = await fetch(`${API}/solve`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  if (!response.ok) throw await rejectionError(response);
+  const { job_id: jobId } = await response.json();
+  return waitForJob(jobId, step);
+}
+
+/**
+ * Run the ticked methods one after the other (so they do not compete for the processor and every
+ * method gets the full time limit). A method that fails does not stop the others.
+ */
+async function runComparison(methods) {
+  const runs = [];
+  for (const [index, key] of methods.entries()) {
+    const step = { n: index + 1, total: methods.length, name: t(`runinfo.method.${key}`) };
+    setStatus("status.compareRunning", { seconds: 0, ...step });
+    try {
+      runs.push({ key, result: await runJob(requestFor(key), step) });
+    } catch (error) {
+      console.error(`Method ${key} failed:`, error);
+      runs.push({ key, result: null, error: errorText(error) });
+    }
+  }
+  return runs;
+}
+
+/** Start the job (or the comparison), poll until it is finished and display the outcome. */
+async function solve() {
+  const method = $("method").value;
+  const isComparison = method === COMPARE;
+  const methods = activeMethods();
+  const form = requestFor(isComparison ? methods[0] : method);
+
+  state.runInfo = {
+    scenario: form.scenario, horizon: form.horizon, month: form.month, method, country: state.country,
+  };
   state.running = true;
   updateSolveButton();
 
   // Hide the previous result immediately when a new run starts.
   state.result = null;
-  state.charts.forEach((chart) => chart.destroy());
-  state.charts = [];
+  state.compare = null;
+  state.compareMethod = null;
+  if (state.view === "compare") state.view = "load";
+  updateViewButtons();
+  clearCharts();
   $("days").replaceChildren();
   $("result").hidden = true;
   $("no-result").hidden = false;
@@ -381,16 +492,19 @@ async function solve() {
     setStatus("status.connecting");
     await waitForServer(() => setStatus("status.waking"), WAKE_UP_TIMEOUT_MS);
 
-    setStatus("status.sending");
-    const response = await fetch(`${API}/solve`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(request),
-    });
-    if (!response.ok) throw await rejectionError(response);
-    const { job_id: jobId } = await response.json();
-
-    state.result = await waitForJob(jobId);
+    if (isComparison) {
+      const runs = await runComparison(methods);
+      const first = runs.find((run) => run.result);
+      if (!first) throw new ApiError(t("compare.noneWorked", { message: runs[0].error }));
+      state.compare = { runs };
+      state.compareMethod = first.key;
+      state.result = first.result;
+      state.view = "compare";
+      updateViewButtons();
+    } else {
+      setStatus("status.sending");
+      state.result = await runJob(form);
+    }
     renderResult();
     setStatus("status.done");
   } catch (error) {
@@ -403,16 +517,22 @@ async function solve() {
   }
 }
 
+/** Name of a method in the selected language (short form used in results and charts). */
+const methodName = (key) => t(`runinfo.method.${key}`);
+
 /** Line under the result heading: country, scenario, period, month and method of the last run. */
 function renderRunInfo() {
   const info = state.runInfo;
   if (!info) return;
+  // After a comparison the load profile and generation mix show the method chosen in the dropdown
+  const methodText = info.method !== COMPARE ? methodName(info.method)
+    : state.view === "compare" ? t("runinfo.method.compare") : methodName(state.compareMethod);
   const parts = [
     `${t("runinfo.country")}: ${t(`country.${info.country}`)}`,
     `${t("runinfo.scenario")}: ${t(`scenario.${info.scenario}`)}`,
     `${t("runinfo.period")}: ${t(`runinfo.period.${info.horizon}`)}`,
     `${t("runinfo.month")}: ${MONTH_NAMES[state.language][Number(info.month) - 1]}`,
-    `${t("runinfo.method")}: ${t(`runinfo.method.${info.method}`)}`,
+    `${t("runinfo.method")}: ${methodText}`,
   ];
   $("run-info").textContent = parts.join(", ");
 }
@@ -451,14 +571,146 @@ function renderResult() {
     reasons.appendChild(item);
   }
 
-  renderDays(locale);
+  renderView(locale);
+}
+
+/** Destroy all charts on the page. */
+function clearCharts() {
+  state.charts.forEach((chart) => chart.destroy());
+  state.charts = [];
+}
+
+/** Show the part of the result that belongs to the selected view (load profile, mix or comparison). */
+function renderView(locale) {
+  const comparing = state.view === "compare";
+  $("single-details").hidden = comparing;
+  $("days").hidden = comparing;
+  $("comparison").hidden = !comparing;
+  $("method-picker").hidden = comparing || !state.compare;
+  renderRunInfo();
+  if (state.compare) renderMethodPicker();
+  if (comparing) renderComparison(locale);
+  else renderDays(locale);
+}
+
+/** Dropdown under the view buttons: the methods of the comparison that delivered a result. */
+function renderMethodPicker() {
+  const select = $("compare-method");
+  select.replaceChildren();
+  for (const run of state.compare.runs.filter((entry) => entry.result)) {
+    const option = document.createElement("option");
+    option.value = run.key;
+    option.textContent = methodName(run.key);
+    select.appendChild(option);
+  }
+  select.value = state.compareMethod;
+}
+
+/** Draws the value above each bar (the texts come from the chart option plugins.barValueLabels.texts). */
+const barValueLabels = {
+  id: "barValueLabels",
+  afterDatasetsDraw(chart) {
+    const texts = chart.options.plugins.barValueLabels?.texts;
+    if (!texts) return;
+    const { ctx } = chart;
+    ctx.save();
+    ctx.fillStyle = "#1f2328";
+    ctx.font = "600 13px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "bottom";
+    chart.getDatasetMeta(0).data.forEach((bar, index) => ctx.fillText(texts[index], bar.x, bar.y - 4));
+    ctx.restore();
+  },
+};
+
+/** Bar chart with one bar per method; `texts` are the labels above the bars. */
+function drawComparisonChart(canvas, { labels, values, colors, texts, axisTitle, locale }) {
+  return new Chart(canvas, {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [{ data: values, backgroundColor: colors, borderWidth: 0, borderRadius: 4, maxBarThickness: 90 }],
+    },
+    plugins: [barValueLabels],
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 800, easing: "easeOutQuart" },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: (item) => texts[item.dataIndex] } },
+        barValueLabels: { texts },
+      },
+      scales: {
+        x: { grid: { display: false }, border: { display: false } },
+        y: {
+          beginAtZero: true,
+          grace: "12%",
+          border: { display: false },
+          grid: { color: "#eef1f4", borderDash: [4, 4] },
+          ticks: { callback: (value) => formatNumber(value, 0, locale) },
+          title: { display: true, text: axisTitle },
+        },
+      },
+    },
+  });
+}
+
+/** The comparison: bar chart of the costs, bar chart in % of the best method and a table. */
+function renderComparison(locale) {
+  clearCharts();
+  const { rows } = buildComparison(state.compare.runs);
+  const compared = rows.filter((row) => row.status === "ok");
+  const common = {
+    labels: compared.map((row) => methodName(row.key)),
+    colors: compared.map((row) => METHOD_COLORS[row.key]),
+    locale,
+  };
+  state.charts.push(drawComparisonChart($("compare-cost-chart"), {
+    ...common,
+    values: compared.map((row) => row.costEur),
+    texts: compared.map((row) => `${formatNumber(row.costEur, 0, locale)} €`),
+    axisTitle: t("compare.axis.cost"),
+  }));
+  state.charts.push(drawComparisonChart($("compare-percent-chart"), {
+    ...common,
+    values: compared.map((row) => row.percentOfBest),
+    texts: compared.map((row) => `${formatNumber(row.percentOfBest, 1, locale)} %`),
+    axisTitle: t("compare.axis.percent"),
+  }));
+
+  const body = $("compare-table").querySelector("tbody");
+  body.replaceChildren();
+  for (const row of rows) {
+    const tr = document.createElement("tr");
+    tr.setAttribute("data-testid", "compare-row");
+    tr.dataset.method = row.key;
+    if (row.isBest) tr.className = "is-best";
+    let status = t(`compare.status.${row.status}`, { message: row.error ?? "" });
+    if (row.status === "ok" && row.stoppedAtLimit) status += ` (${t("compare.limitReached")})`;
+    const percent = row.percentOfBest === null
+      ? "–"
+      : `${formatNumber(row.percentOfBest, 1, locale)} %${row.isBest ? ` (${t("compare.best")})` : ""}`;
+    const cells = [
+      methodName(row.key),
+      row.costEur === null ? "–" : `${formatNumber(row.costEur, 0, locale)} €`,
+      percent,
+      row.seconds === null ? "–" : `${formatNumber(row.seconds, 1, locale)} s`,
+      status,
+    ];
+    for (const text of cells) {
+      const td = document.createElement("td");
+      td.textContent = text;   // textContent: server text is never interpreted as HTML
+      tr.appendChild(td);
+    }
+    body.appendChild(tr);
+  }
 }
 
 /** One section with title, daily cost and chart per day, shown one below the other. */
 function renderDays(locale) {
   const container = $("days");
-  state.charts.forEach((chart) => chart.destroy());
-  state.charts = [];
+  clearCharts();
   container.replaceChildren();
 
   buildDayProfiles(state.result).forEach((profile, index) => {
@@ -889,21 +1141,28 @@ function drawDonut(canvas, profile, locale) {
   });
 }
 
-/** Switch between the load profile view and the generation mix view. */
+/** Switch between the load profile, the generation mix and the comparison. */
 function setView(view) {
   state.view = view;
   updateViewButtons();
-  if (state.result) renderDays(LOCALES[state.language]);
+  if (state.result) renderView(LOCALES[state.language]);
 }
 
 function updateViewButtons() {
   document.querySelectorAll("[data-view]").forEach((button) => {
+    button.hidden = button.dataset.view === "compare" && !state.compare;   // only after a comparison
     button.setAttribute("aria-pressed", String(button.dataset.view === state.view));
   });
 }
 
 document.querySelectorAll("[data-view]").forEach((button) => {
   button.addEventListener("click", () => setView(button.dataset.view));
+});
+$("compare-method").addEventListener("change", () => {
+  const run = state.compare.runs.find((entry) => entry.key === $("compare-method").value);
+  state.compareMethod = run.key;
+  state.result = run.result;
+  renderResult();
 });
 updateViewButtons();
 
