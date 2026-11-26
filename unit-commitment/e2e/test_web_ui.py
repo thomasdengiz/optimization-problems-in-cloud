@@ -299,13 +299,12 @@ def test_comparison_runs_all_methods_and_shows_charts_table_and_method_dropdown(
     expect(app_page.get_by_test_id("r-cost")).to_be_hidden()   # the single-result cards belong to the other views
     expect(app_page.get_by_test_id("compare-method")).to_be_hidden()
 
-    # exactly one method is the best and shows 100 %
+    # the quality of the best method is 100 %, every other method is lower
     best = app_page.locator("tr.is-best")
     expect(best).to_have_count(1)
     expect(best).to_contain_text("100,0 %")
-    # the exact method cannot be beaten (up to its gap), so every other method is at least about 100 %
-    for percent in app_page.locator("#compare-table tbody tr td:nth-child(3)").all_inner_texts():
-        assert float(percent.split(" ")[0].replace(",", ".")) >= 100.0
+    for quality in app_page.locator("#compare-table tbody tr td:nth-child(3)").all_inner_texts():
+        assert float(quality.split(" ")[0].replace(",", ".")) <= 100.0
 
     # load profile / generation mix of a single method of the comparison
     app_page.get_by_test_id("view-load").click()
@@ -328,3 +327,39 @@ def test_comparison_runs_all_methods_and_shows_charts_table_and_method_dropdown(
     expect(app_page.get_by_test_id("r-feasible")).to_have_text("ja", timeout=60000)
     expect(app_page.get_by_test_id("view-compare")).to_be_hidden()
     expect(app_page.get_by_test_id("compare-method")).to_be_hidden()
+
+
+def test_comparison_titles_the_parameter_groups_with_their_method(app_page: Page):
+    select_germany(app_page)
+    app_page.get_by_test_id("method").select_option("ea")
+    expect(app_page.locator(".param-title:visible")).to_have_count(0)   # a single method needs no title
+
+    app_page.get_by_test_id("method").select_option("compare")
+
+    titles = app_page.locator(".param-title:visible")
+    expect(titles).to_have_text([
+        "Exakt (HiGHS/Pyomo)",
+        "Evolutionärer Algorithmus",
+        "Partikelschwarm-Optimierung",
+        "Evolutionärer Algorithmus und Partikelschwarm-Optimierung",
+    ])
+
+
+def test_comparison_shows_the_running_method_next_to_the_spinner(app_page: Page):
+    select_germany(app_page)
+    app_page.get_by_test_id("method").select_option("compare")
+    for key in ("exact", "priority_list"):
+        app_page.get_by_test_id(f"compare-{key}").uncheck()
+    app_page.get_by_test_id("scenario").select_option("small")
+    app_page.get_by_test_id("horizon").select_option("day")
+    app_page.get_by_test_id("time-limit").fill("4")
+    app_page.get_by_test_id("opt-generations").fill("5000")
+    app_page.get_by_test_id("opt-iterations").fill("5000")
+
+    app_page.get_by_test_id("solve-button").click()
+
+    detail = app_page.get_by_test_id("computing-detail")
+    expect(detail).to_contain_text("Methode 1 von 2 (Evolutionärer Algorithmus)", timeout=30000)
+    expect(detail).to_contain_text("Methode 2 von 2 (Partikelschwarm-Optimierung)", timeout=30000)
+    expect(app_page.get_by_test_id("view-compare")).to_be_visible(timeout=30000)
+    expect(app_page.get_by_test_id("computing")).to_be_hidden()

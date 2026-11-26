@@ -60,14 +60,16 @@
         <p id="time-limit-hint" class="hint"></p>
       </div>
 
-      <div id="params-exact" class="params">
+      <div id="params-exact" class="params method-params">
+        <h4 class="param-title" data-i18n="method.exact"></h4>
         <label for="mip-gap" data-i18n="mipGap.label"></label>
         <input id="mip-gap" data-testid="mip-gap" type="number" min="0" max="100" step="0.1" value="1">
         <p class="hint" data-i18n="mipGap.hint"></p>
       </div>
 
       <!-- Algorithm parameters of the metaheuristics. The start values come from the server (GET /methods). -->
-      <div id="params-ea" class="params" hidden>
+      <div id="params-ea" class="params method-params" hidden>
+        <h4 class="param-title" data-i18n="method.ea"></h4>
         <label for="opt-population_size" data-i18n="param.population_size.label"></label>
         <input id="opt-population_size" data-testid="opt-population_size" type="number" min="4" max="200" step="1">
         <p class="hint" data-i18n="param.population_size.hint"></p>
@@ -82,7 +84,8 @@
         <p class="hint" data-i18n="param.crossover_rate.hint"></p>
       </div>
 
-      <div id="params-pso" class="params" hidden>
+      <div id="params-pso" class="params method-params" hidden>
+        <h4 class="param-title" data-i18n="method.pso"></h4>
         <label for="opt-swarm_size" data-i18n="param.swarm_size.label"></label>
         <input id="opt-swarm_size" data-testid="opt-swarm_size" type="number" min="2" max="200" step="1">
         <p class="hint" data-i18n="param.swarm_size.hint"></p>
@@ -100,7 +103,8 @@
         <p class="hint" data-i18n="param.social.hint"></p>
       </div>
 
-      <div id="params-seed" class="params" hidden>
+      <div id="params-seed" class="params method-params" hidden>
+        <h4 class="param-title" data-i18n="compare.seedTitle"></h4>
         <label for="opt-seed" data-i18n="param.seed.label"></label>
         <input id="opt-seed" data-testid="opt-seed" type="number" min="0" step="1">
         <p class="hint" data-i18n="param.seed.hint"></p>
@@ -134,7 +138,10 @@
       <h2 data-i18n="result.heading"></h2>
       <p id="computing" data-testid="computing" class="computing" role="status" hidden>
         <span class="spinner" aria-hidden="true"></span>
-        <span data-i18n="result.computing"></span>
+        <span>
+          <span data-i18n="result.computing"></span>
+          <span id="computing-detail" data-testid="computing-detail" class="computing-detail"></span>
+        </span>
       </p>
       <p id="no-result" class="hint" data-i18n="result.none"></p>
 

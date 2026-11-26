@@ -71,6 +71,11 @@ option:disabled { color: #9aa5b1; }
 .checks { display: flex; flex-wrap: wrap; gap: .4rem 1.2rem; }
 .checks .check { display: flex; align-items: center; gap: .4rem; margin: .2rem 0; font-weight: 400; }
 .checks .check input { width: auto; margin: 0; }
+.param-title { display: none; margin: 0; }
+#inputs.comparing .param-title { display: block; color: var(--accent); }
+#inputs.comparing .method-params { margin-top: 1.2rem; padding-top: .8rem; border-top: 2px solid var(--border); }
+#inputs.comparing .method-params:not([hidden]) ~ .method-params:not([hidden]) { margin-top: 1.2rem; }
+.computing-detail { display: block; font-weight: 400; font-size: .9rem; color: #57606a; }
 .method-picker { max-width: 320px; }
 .method-picker[hidden], #single-details[hidden], #comparison[hidden], #days[hidden] { display: none; }
 .compare-box { height: 280px; margin-bottom: 1rem; }

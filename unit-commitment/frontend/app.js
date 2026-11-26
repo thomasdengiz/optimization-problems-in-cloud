@@ -147,6 +147,9 @@ function renderStatus() {
   } else {
     $("status").textContent = t("status.error", { message: status.text });
   }
+  // Next to the spinner in the result area: which method of the comparison is running (with the time counter)
+  const comparing = state.running && status?.key?.startsWith("status.compare");
+  $("computing-detail").textContent = comparing ? t(status.key, status.params) : "";
 }
 
 /** Methods ticked for the comparison, in the order of the checkboxes. */
@@ -238,6 +241,7 @@ function renderInfoTexts() {
   // the exact method, the algorithm parameters to the chosen metaheuristic. In the comparison the groups
   // of all ticked methods are shown.
   $("params-compare").hidden = method !== COMPARE;
+  $("inputs").classList.toggle("comparing", method === COMPARE);   // CSS: titles and separators of the parameter groups
   $("params-time-limit").hidden = !active.some((key) => key === "exact" || key in METHOD_PARAMS);
   $("params-exact").hidden = !active.includes("exact");
   $("params-ea").hidden = !active.includes("ea");
@@ -623,8 +627,8 @@ const barValueLabels = {
   },
 };
 
-/** Bar chart with one bar per method; `texts` are the labels above the bars. */
-function drawComparisonChart(canvas, { labels, values, colors, texts, axisTitle, locale }) {
+/** Bar chart with one bar per method; `texts` are the labels above the bars. `max` fixes the top of the axis. */
+function drawComparisonChart(canvas, { labels, values, colors, texts, axisTitle, locale, max = undefined }) {
   return new Chart(canvas, {
     type: "bar",
     data: {
@@ -636,6 +640,7 @@ function drawComparisonChart(canvas, { labels, values, colors, texts, axisTitle,
       responsive: true,
       maintainAspectRatio: false,
       animation: { duration: 800, easing: "easeOutQuart" },
+      layout: { padding: { top: 22 } },   // room for the value above the highest bar
       plugins: {
         legend: { display: false },
         tooltip: { callbacks: { label: (item) => texts[item.dataIndex] } },
@@ -645,7 +650,8 @@ function drawComparisonChart(canvas, { labels, values, colors, texts, axisTitle,
         x: { grid: { display: false }, border: { display: false } },
         y: {
           beginAtZero: true,
-          grace: "12%",
+          max,
+          grace: max === undefined ? "12%" : 0,
           border: { display: false },
           grid: { color: "#eef1f4", borderDash: [4, 4] },
           ticks: { callback: (value) => formatNumber(value, 0, locale) },
@@ -656,7 +662,7 @@ function drawComparisonChart(canvas, { labels, values, colors, texts, axisTitle,
   });
 }
 
-/** The comparison: bar chart of the costs, bar chart in % of the best method and a table. */
+/** The comparison: bar chart of the costs, bar chart of the quality (best method = 100 %) and a table. */
 function renderComparison(locale) {
   clearCharts();
   const { rows } = buildComparison(state.compare.runs);
@@ -674,9 +680,10 @@ function renderComparison(locale) {
   }));
   state.charts.push(drawComparisonChart($("compare-percent-chart"), {
     ...common,
-    values: compared.map((row) => row.percentOfBest),
-    texts: compared.map((row) => `${formatNumber(row.percentOfBest, 1, locale)} %`),
-    axisTitle: t("compare.axis.percent"),
+    values: compared.map((row) => row.qualityPercent),
+    texts: compared.map((row) => `${formatNumber(row.qualityPercent, 1, locale)} %`),
+    axisTitle: t("compare.axis.quality"),
+    max: 100,
   }));
 
   const body = $("compare-table").querySelector("tbody");
@@ -688,13 +695,13 @@ function renderComparison(locale) {
     if (row.isBest) tr.className = "is-best";
     let status = t(`compare.status.${row.status}`, { message: row.error ?? "" });
     if (row.status === "ok" && row.stoppedAtLimit) status += ` (${t("compare.limitReached")})`;
-    const percent = row.percentOfBest === null
+    const quality = row.qualityPercent === null
       ? "–"
-      : `${formatNumber(row.percentOfBest, 1, locale)} %${row.isBest ? ` (${t("compare.best")})` : ""}`;
+      : `${formatNumber(row.qualityPercent, 1, locale)} %${row.isBest ? ` (${t("compare.best")})` : ""}`;
     const cells = [
       methodName(row.key),
       row.costEur === null ? "–" : `${formatNumber(row.costEur, 0, locale)} €`,
-      percent,
+      quality,
       row.seconds === null ? "–" : `${formatNumber(row.seconds, 1, locale)} s`,
       status,
     ];

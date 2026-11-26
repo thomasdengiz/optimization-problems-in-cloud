@@ -55,7 +55,8 @@ export function buildSolveRequest(form) {
  * `error` the message if the method delivered nothing. Every returned row has
  *  - key, status ("ok", "infeasible" or "failed"), error
  *  - costEur, seconds (total run time), stoppedAtLimit
- *  - percentOfBest: cost in % of the cheapest feasible method (that one is 100), null without a feasible cost
+ *  - qualityPercent: quality of the plan in % (cheapest feasible method's cost divided by this cost, times 100).
+ *    The cheapest feasible method has 100, every other method is lower. null without a feasible cost.
  *  - isBest: true for the cheapest feasible method
  * Only feasible results are compared: an infeasible plan cannot be called cheaper than a valid one.
  */
@@ -65,7 +66,7 @@ export function buildComparison(runs) {
     if (!result) {
       return {
         key: run.key, status: "failed", error: run.error ?? null, costEur: null, seconds: null,
-        stoppedAtLimit: false, percentOfBest: null, isBest: false,
+        stoppedAtLimit: false, qualityPercent: null, isBest: false,
       };
     }
     return {
@@ -75,7 +76,7 @@ export function buildComparison(runs) {
       costEur: result.total_cost_eur,
       seconds: result.solve_time_ms / 1000,
       stoppedAtLimit: Boolean(result.stopped_at_time_limit),
-      percentOfBest: null,
+      qualityPercent: null,
       isBest: false,
     };
   });
@@ -83,7 +84,7 @@ export function buildComparison(runs) {
   const feasible = rows.filter((row) => row.status === "ok");
   const bestCostEur = feasible.length > 0 ? Math.min(...feasible.map((row) => row.costEur)) : null;
   for (const row of feasible) {
-    row.percentOfBest = bestCostEur > 0 ? (row.costEur / bestCostEur) * 100 : 100;
+    row.qualityPercent = row.costEur > 0 ? (bestCostEur / row.costEur) * 100 : 100;
     row.isBest = row.costEur === bestCostEur;
   }
   return { rows, bestCostEur };
